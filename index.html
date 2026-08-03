@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>හරියටම ගූගල් මැප්ස් වගේ පාර</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        html, body { 
+            font-family: sans-serif; 
+            text-align: center; 
+            margin: 0; 
+            padding: 0; 
+            background: #f0f0f0; 
+            overflow: hidden; 
+            height: 100%; 
+            width: 100%;
+        }
+        
+        /* ඩෙස්ක්ටොප් එකේදී පාලන පුවරුව පාවෙන ලෙස සැකසීම */
+        @media (min-width: 768px) {
+            .controls {
+                position: absolute !important;
+                top: 15px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: auto;
+                max-width: 90vw;
+                border-radius: 12px;
+                z-index: 1001;
+            }
+        }
+
+        .controls {
+            background: #fff; 
+            padding: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; gap: 8px; 
+            z-index: 1000;
+            position: relative;
+        }
+        .row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
+        input, button {
+            padding: 10px 15px; font-size: 14px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer;
+        }
+        button { background: #1A73E8; color: white; border: none; }
+        button.clear { background: #555; }
+        
+        /* Full Screen එකට මැප් එක සැකසීම */
+        #map { 
+            width: 100vw; 
+            height: 100vh; /* සම්පූර්ණ තිරයේ උසට විහිදේ */
+            z-index: 0; 
+            background: #e5e3df; 
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        #status {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            padding: 8px 15px; background: rgba(0, 0, 0, 0.85); color: #fff; 
+            font-weight: bold; font-size: 13px; border-radius: 20px; z-index: 1000; white-space: nowrap;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;
+        }
+        
+        /* ඩෙස්ක්ටොප් එකේදී පහළට යාමේ බොත්තම වෙනස් වීම */
+        @media (min-width: 768px) {
+            #status {
+                top: 100px;
+            }
+            #recenter-btn {
+                bottom: 30px;
+                right: 30px;
+            }
+        }
+
+        #recenter-btn {
+            position: absolute; bottom: 20px; right: 20px; width: 50px; height: 50px;
+            background: #fff; border: none; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            font-size: 24px; cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center;
+        }
+
+        .marker-wrapper {
+            position: absolute;
+            width: 100px;
+            height: 140px;
+            bottom: 0; 
+            left: 50%; 
+            transform: translate(-50%, 100%) scale(var(--zoom-scale, 1)); 
+            transform-origin: center bottom; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none; 
+        }
+
+        .custom-marker-img {
+            width: 90px; height: 90px; border-radius: 8px; border: 3px solid #fff; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6); object-fit: cover; background-color: #eee;
+            margin-bottom: -15px; z-index: 1; position: relative;
+        }
+
+        .custom-pin {
+            width: 24px; height: 24px; background: #dc3545; border: 3px solid white;
+            border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 2; position: relative; pointer-events: auto; cursor: pointer;
+        }
+
+        .marker-name-label {
+            background: #dc3545; color: white; padding: 4px 8px; border-radius: 12px;
+            font-size: 11px; font-weight: bold; margin-bottom: -10px; z-index: 1; position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; border: 2px solid white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div class="row">
+            <p style="margin:0; font-size:13px; font-weight:bold; color: #d35400;">පොයින්ට් අතර ගූගල් මැප්ස් වගේ හරියටම පාර අඳියි. ඔටෝ යයි.</p>
+        </div>
+        <div class="row">
+            <input type="text" id="placeName" placeholder="ස්ථානයේ නම" style="flex: 1; max-width: 200px;">
+            <input type="number" id="hideTime" placeholder="Hidden වෙන වේලාව" style="width: 120px;" value="3" min="1" max="30">
+            <button onclick="addPlace()">📍 ස්ථානය එක් කරන්න</button>
+            <button onclick="clearPlaces()" class="clear">🗑️ සියල්ල මකන්න</button>
+        </div>
+    </div>
+
+    <div id="status">📍 ලයිව් ලොකේෂන්...</div>
+    <button id="recenter-btn" onclick="recenterMap()">🧭</button>
+
+    <!-- මැප් එක පෙන්වන තැන -->
+    <div id="map"></div>
+
+    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+    <input type="file" id="imageChangeInput" accept="image/*" style="display: none;">
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map', {
+            zoomControl: false, attributionControl: false,
+            doubleClickZoom: false, inertia: true, inertiaDeceleration: 2000, zoomAnimation: true
+        }).setView([7.8731, 80.7718], 7);
+
+        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
+
+        var liveMarker = null, accuracyCircle = null, userInteracting = false, lastLatLng = null, watchId = null;
+        var myPlaces = [], placeMarkers = [], routeLines = [];
+        
+        // ඔටෝ යාමට අවශ්‍ය අලුත් Variables
+        var isAutoNavigating = false;
+        var navPath = [], navIndex = 0, navStartTime = 0, navTotalDuration = 0;
+        var navStartLatLng = null, navTargetLatLng = null, navAnimationFrameId = null;
+
+        var animationFrameId = null, startLatLng = null, targetLatLng = null, startTime = 0, duration = 1000;
+        var currentHeading = 0, targetHeading = 0, startHeading = 0, headingStartTime = 0, headingDuration = 300, isRotating = false;
+        var tempLatLng = null, activeMarkerIndex = null, clickTimeout = null, preventSingleClick = false, hideTimers = {};
+
+        // ----------------------------------------------------
+        // සද්දය නිකුත් කිරීම සඳහා වන ලොජිකය (Web Audio API)
+        // ----------------------------------------------------
+        var audioCtx = null;
+        var hasBeepedForTarget = false; // සද්දය දෙවරක් නොඑන්න පාලනය කිරීමට
+
+        function initAudio() {
+            if (!audioCtx) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch(e) { console.error("Audio not supported"); }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playBeep() {
+            if (!audioCtx) return;
+            var oscillator = audioCtx.createOscillator();
+            var gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // සද්දයේ වර්ගය සහ තීව්‍රතාවය සකස් කිරීම
+            oscillator.type = 'sine'; 
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // 880 Hz සද්දයක් (High pitch beep)
+            
+            // සද්දය ක්‍රමයෙන් අඩු වෙමින් නතර වීම
+            gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        }
+
+        // පිටුව ලෝඩ් වූ වහාම audio එක ready කරගැනීම සඳහා
+        document.body.addEventListener('click', initAudio, { once: true });
+        document.body.addEventListener('touchend', initAudio, { once: true });
+
+        map.on('dragstart zoomstart', function() { userInteracting = true; });
+
+        function updateMarkerScales() {
+            var zoom = map.getZoom();
+            var scale = Math.max(0.6, Math.min(1, (zoom - 10) / 5)); 
+            placeMarkers.forEach(function(marker) {
+                var el = marker.getElement();
+                if (el) el.style.setProperty('--zoom-scale', scale);
+            });
+        }
+        map.on('zoomend', updateMarkerScales);
+
+        function createArrowIcon(heading) {
+            return L.divIcon({ 
+                html: `<svg width="50" height="50" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${heading}deg);"><path d="M50 5 L85 95 L50 78 L15 95 Z" fill="#1A73E8" stroke="white" stroke-width="6" stroke-linejoin="round"/><circle cx="50" cy="50" r="5" fill="white" opacity="0.9"/></svg>`, 
+                className: '', iconSize: [50, 50], iconAnchor: [25, 25] 
+            });
+        }
+
+        function getShortestAngleDiff(start, end) { var diff = end - start; if (diff > 180) diff -= 360; if (diff < -180) diff += 360; return diff; }
+        
+        function getBearing(lat1, lon1, lat2, lon2) {
+            var dLon = (lon2 - lon1) * Math.PI / 180; lat1 = lat1 * Math.PI / 180; lat2 = lat2 * Math.PI / 180;
+            var y = Math.sin(dLon) * Math.cos(lat2);
+            var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+            return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+        }
+
+        function animateMovement() {
+            var elapsed = Date.now() - startTime;
+            var progress = Math.min(elapsed / duration, 1);
+            var easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+            if (startLatLng && targetLatLng) {
+                var currentLat = startLatLng.lat + (targetLatLng.lat - startLatLng.lat) * easeProgress;
+                var currentLng = startLatLng.lng + (targetLatLng.lng - startLatLng.lng) * easeProgress;
+                if (liveMarker) liveMarker.setLatLng([currentLat, currentLng]);
+                if (!userInteracting) map.panTo([currentLat, currentLng], { animate: false });
+            }
+            if (progress < 1) { animationFrameId = requestAnimationFrame(animateMovement); } else { animationFrameId = null; }
+        }
+
+        function animateRotation() {
+            var hElapsed = Date.now() - headingStartTime;
+            var hProgress = Math.min(hElapsed / headingDuration, 1);
+            var hEase = hProgress < 0.5 ? 2 * hProgress * hProgress : 1 - Math.pow(-2 * hProgress + 2, 2) / 2;
+            var animatedHeading = startHeading + getShortestAngleDiff(startHeading, targetHeading) * hEase;
+            if (animatedHeading < 0) animatedHeading += 360; if (animatedHeading >= 360) animatedHeading -= 360;
+            currentHeading = animatedHeading;
+            if (liveMarker) liveMarker.setIcon(createArrowIcon(currentHeading));
+            if (hProgress < 1) { requestAnimationFrame(animateRotation); } else { isRotating = false; }
+        }
+
+        function triggerArrowRotation(newHeading) {
+            if (Math.abs(getShortestAngleDiff(currentHeading, newHeading)) < 2) return;
+            startHeading = currentHeading; targetHeading = newHeading; headingStartTime = Date.now();
+            if (!isRotating) { isRotating = true; requestAnimationFrame(animateRotation); }
+        }
+
+        map.on('click', function(e) {
+            tempLatLng = e.latlng;
+            document.getElementById('placeName').value = "ස්ථානය " + (myPlaces.length + 1);
+            document.getElementById('placeName').focus();
+        });
+
+        function addPlace() {
+            var name = document.getElementById('placeName').value;
+            var timeToHide = parseInt(document.getElementById('hideTime').value) || 3; 
+            if (!tempLatLng) { alert("කරුණාකර මුලින්ම මැප් එකේ හිස් තැනක් අත තදන්න."); return; }
+            if (!name) name = "ස්ථානය " + (myPlaces.length + 1);
+
+            var marker = L.marker(tempLatLng, { icon: L.divIcon({ html: `<div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }) }).addTo(map);
+            var markerIndex = myPlaces.length; 
+            myPlaces.push({ latlng: tempLatLng, name: name, id: myPlaces.length + 1, hasImage: false, imageSrc: "", hideTime: timeToHide, isVisible: false });
+            placeMarkers.push(marker);
+
+            marker.on('click', function(e) {
+                if(e.originalEvent.target.classList.contains('custom-pin')) {
+                    L.DomEvent.stopPropagation(e);
+                    if (preventSingleClick) { preventSingleClick = false; return; }
+                    clickTimeout = setTimeout(function() { handleSingleClick(markerIndex); }, 300);
+                }
+            });
+            marker.on('dblclick', function(e) {
+                if(e.originalEvent.target.classList.contains('custom-pin')) {
+                    L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
+                    clearTimeout(clickTimeout); preventSingleClick = true; handleDoubleClick(markerIndex);
+                }
+            });
+
+            setTimeout(updateMarkerScales, 50);
+            var startPoint, endPoint = tempLatLng;
+            if (myPlaces.length === 1) { startPoint = liveMarker ? liveMarker.getLatLng() : map.getCenter(); } else { startPoint = myPlaces[myPlaces.length - 2].latlng; }
+            
+            drawPerfectRoute(startPoint, endPoint);
+            tempLatLng = null; document.getElementById('placeName').value = "";
+        }
+
+        function createImageIcon(src) {
+            return L.divIcon({ html: `<img src="${src}" class="custom-marker-img"><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] });
+        }
+        function createNameIcon(name) {
+            return L.divIcon({ html: `<div class="marker-name-label">${name}</div><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] });
+        }
+
+        function handleSingleClick(index) {
+            var placeData = myPlaces[index];
+            if (!placeData.hasImage) { document.getElementById('imageInput').dataset.markerIndex = index; document.getElementById('imageInput').click(); return; }
+            if (placeData.isVisible) { hideImage(index); } else { showImage(index); }
+        }
+        function showImage(index) {
+            var marker = placeMarkers[index], placeData = myPlaces[index];
+            if (activeMarkerIndex !== null && activeMarkerIndex !== index && myPlaces[activeMarkerIndex].isVisible) hideImage(activeMarkerIndex);
+            placeData.isVisible = true; activeMarkerIndex = index; marker.setIcon(createImageIcon(placeData.imageSrc));
+            if (hideTimers[index]) clearTimeout(hideTimers[index]);
+            hideTimers[index] = setTimeout(function() { hideImage(index); }, placeData.hideTime * 1000); 
+        }
+        function hideImage(index) {
+            var marker = placeMarkers[index], placeData = myPlaces[index];
+            placeData.isVisible = false;
+            if (hideTimers[index]) { clearTimeout(hideTimers[index]); delete hideTimers[index]; }
+            marker.setIcon(createNameIcon(placeData.name)); if (activeMarkerIndex === index) activeMarkerIndex = null;
+        }
+        function handleDoubleClick(index) {
+            var placeData = myPlaces[index];
+            if (!placeData.hasImage) { alert("ඡායාරූපය වෙනස් කරන්න නම්, මුලින්ම Single Click එකකින් ඡායාරූපයක් දාන්න."); return; }
+            showImage(index); document.getElementById('imageChangeInput').dataset.markerIndex = index; document.getElementById('imageChangeInput').click();
+        }
+
+        document.getElementById('imageInput').addEventListener('change', function(event) {
+            var file = event.target.files[0], index = parseInt(this.dataset.markerIndex);
+            if (isNaN(index) || !file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) { myPlaces[index].hasImage = true; myPlaces[index].imageSrc = e.target.result; showImage(index); this.value = ""; }.bind(this);
+            reader.readAsDataURL(file);
+        });
+        document.getElementById('imageChangeInput').addEventListener('change', function(event) {
+            var file = event.target.files[0], index = parseInt(this.dataset.markerIndex);
+            if (isNaN(index) || !file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) { myPlaces[index].imageSrc = e.target.result; showImage(index); this.value = ""; }.bind(this);
+            reader.readAsDataURL(file);
+        });
+
+        // ---------------------------------------------
+        // ගූගල් මැප්ස් වගේ හරියටම පාර අඳින ලොජිකය (Nearest Road Snapping සමඟ)
+        // ---------------------------------------------
+        async function drawPerfectRoute(startLoc, endLoc) {
+            document.getElementById('status').style.display = 'block';
+            document.getElementById('status').innerText = "🟡 පාර සොයමින්...";
+
+            try {
+                var routeData = await fetchRoute(startLoc, endLoc);
+                var routeCoords = routeData.coordinates.map(c => [c[1], c[0]]);
+                
+                var snappedStart = routeCoords[0];
+                var snappedEnd = routeCoords[routeCoords.length - 1];
+
+                var allCoords = [];
+                allCoords.push([startLoc.lat, startLoc.lng]);
+                allCoords.push(snappedStart);
+
+                for (var i = 1; i < routeCoords.length; i++) {
+                    allCoords.push(routeCoords[i]);
+                }
+
+                allCoords.push([endLoc.lat, endLoc.lng]);
+                
+                var routeLine = L.polyline(allCoords, {
+                    color: '#4caf50', weight: 6, opacity: 0.8,
+                    lineCap: 'round', lineJoin: 'round'
+                }).addTo(map);
+                
+                routeLines.push(routeLine);
+
+                // දුර සහ කාලය ගණනය කිරීම (Google Maps වගේ පෙන්වන්න)
+                var totalDistance = 0;
+                for (var i = 0; i < allCoords.length - 1; i++) {
+                    totalDistance += map.distance(allCoords[i], allCoords[i + 1]);
+                }
+                var distanceKm = (totalDistance / 1000).toFixed(2);
+                var timeMin = Math.max(1, Math.round((totalDistance / 1000) / 0.4)); // සාමාන්‍ය වේගය 24km/h කින් ගණනය කරයි
+
+                document.getElementById('status').innerText = `🏁 පාර සාර්ථකයි! දුර: ${distanceKm} km | කාලය: ${timeMin} මිනි.`;
+                setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 3000);
+
+                // ඔටෝ නැවිගේෂන් එක ආරම්භ කිරීම
+                if (liveMarker) {
+                    startAutoNavigation(allCoords);
+                }
+                
+            } catch (error) {
+                var straightLine = L.polyline([startLoc, endLoc], {
+                    color: '#4caf50', weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round'
+                }).addTo(map);
+                
+                routeLines.push(straightLine);
+                document.getElementById('status').innerText = "⚠️ පාරක් හමු නොවීය (සෘජු පේළියක් අඳින ලදි)";
+                setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
+                
+                if (liveMarker) {
+                    startAutoNavigation([[startLoc.lat, startLoc.lng], [endLoc.lat, endLoc.lng]]);
+                }
+            }
+        }
+
+        // ---------------------------------------------
+        // ඔටෝ නැවිගේෂන් ලොජිකය (Auto Travel)
+        // ---------------------------------------------
+        function startAutoNavigation(pathCoords) {
+            isAutoNavigating = true;
+            navPath = pathCoords;
+            navIndex = 0;
+            hasBeepedForTarget = false; // අලුත් ගමනක් එනවිට beep එක reset කිරීම
+            userInteracting = false; // යාමේදී මැප් එක අත වනලා නොගෙන සෙට් වෙන්න
+            map.setView(liveMarker.getLatLng(), 18, { animate: true });
+            
+            setTimeout(() => {
+                navStartTime = Date.now();
+                // ලක්ෂ්‍ය අතර දුර අනුව කාලය ගණනය කිරීම (තත්පර 1ක් ප්‍රතිචාරීතාවයක්)
+                navTotalDuration = 1000; 
+                navStartLatLng = L.latLng(navPath[0]);
+                navTargetLatLng = L.latLng(navPath[1]);
+                
+                // මුල් දිශාව සකසා ගැනීම
+                var initBearing = getBearing(navStartLatLng.lat, navStartLatLng.lng, navTargetLatLng.lat, navTargetLatLng.lng);
+                triggerArrowRotation(initBearing);
+
+                if (!navAnimationFrameId) {
+                    navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
+                }
+            }, 1000);
+        }
+
+        function animateAutoNavigation() {
+            if (!isAutoNavigating || !liveMarker) return;
+
+            var elapsed = Date.now() - navStartTime;
+            var progress = Math.min(elapsed / navTotalDuration, 1);
+            
+            // සුමට චලිතයක් සඳහා (Smooth movement)
+            var easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+            
+            var currentLat = navStartLatLng.lat + (navTargetLatLng.lat - navStartLatLng.lat) * easeProgress;
+            var currentLng = navStartLatLng.lng + (navTargetLatLng.lng - navStartLatLng.lng) * easeProgress;
+            
+            liveMarker.setLatLng([currentLat, currentLng]);
+            if (!userInteracting) map.panTo([currentLat, currentLng], { animate: false });
+
+            // අඟලෙන් අඟලට දිශාව වෙනස් කිරීම
+            var dynamicBearing = getBearing(navStartLatLng.lat, navStartLatLng.lng, navTargetLatLng.lat, navTargetLatLng.lng);
+            triggerArrowRotation(dynamicBearing);
+
+            // ----------------------------------------------------
+            // අවසාන ස්ථානයට ළඟා වීමට ආසන්න වූ විට සද්දය නිකුත් කිරීම
+            // ----------------------------------------------------
+            if (navIndex === navPath.length - 2 && !hasBeepedForTarget) {
+                // දැනට ඇති ස්ථානය සහ අවසාන ස්ථානය අතර දුර මැනීම
+                var distToTarget = map.distance([currentLat, currentLng], navPath[navPath.length - 1]);
+                
+                // මීටර් 30ක් (පමණ) ඇතුළත විට සද්දය නිකුත් වේ
+                if (distToTarget < 30) { 
+                    playBeep();
+                    hasBeepedForTarget = true; // දෙවරක් නොඑන්න පාලනය කිරීමට
+                }
+            }
+
+            if (progress < 1) {
+                navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
+            } else {
+                navIndex++;
+                if (navIndex < navPath.length - 1) {
+                    // ඊළඟ ලක්ෂ්‍යයට යාම
+                    navStartLatLng = L.latLng(navPath[navIndex]);
+                    navTargetLatLng = L.latLng(navPath[navIndex + 1]);
+                    
+                    // ලක්ෂ්‍ය අතර දුර අනුව වේගය සකස් කිරීම
+                    var dist = map.distance(navPath[navIndex], navPath[navIndex + 1]);
+                    navTotalDuration = Math.max(500, dist * 10); // දුර අනුව කාලය වෙනස් වේ
+                    navStartTime = Date.now();
+                    
+                    navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
+                } else {
+                    // ගමන අවසානය
+                    isAutoNavigating = false;
+                    navAnimationFrameId = null;
+                }
+            }
+        }
+
+        function fetchRoute(start, end) {
+            return new Promise((resolve, reject) => {
+                var url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+                fetch(url).then(r => r.json()).then(data => {
+                    if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
+                        resolve(data.routes[0].geometry);
+                    } else {
+                        reject("No route");
+                    }
+                }).catch(err => reject(err));
+            });
+        }
+
+        function clearPlaces() {
+            // ඔටෝ නැවිගේෂන් එකත් නතර කරන්න
+            isAutoNavigating = false; 
+            if (navAnimationFrameId) cancelAnimationFrame(navAnimationFrameId);
+            navAnimationFrameId = null;
+
+            myPlaces = [];
+            placeMarkers.forEach(m => map.removeLayer(m)); placeMarkers = [];
+            routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
+            activeMarkerIndex = null;
+            for (var key in hideTimers) clearTimeout(hideTimers[key]);
+            hideTimers = {};
+        }
+
+        function startLiveTracking() { 
+            if (watchId) return; 
+            document.getElementById('status').style.display = 'block';
+            document.getElementById('status').innerText = "📍 ලයිව් ලොකේෂන් සොයමින් පවතී...";
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(pos => {
+                    var lat = pos.coords.latitude, lon = pos.coords.longitude, acc = pos.coords.accuracy;
+                    var heading = pos.coords.heading, speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
+                    var newLocation = L.latLng(lat, lon);
+                    
+                    // ඔටෝ නැවිගේෂන් එක නැති විට විතරක් GPS එකෙන් දිශාව ගන්න
+                    if(!isAutoNavigating) {
+                        if (heading !== null && !isNaN(heading) && speed > 1) triggerArrowRotation(heading);
+                        else if (lastLatLng && speed > 1 && lastLatLng.distanceTo(newLocation) > 3) triggerArrowRotation(getBearing(lastLatLng.lat, lastLatLng.lng, lat, lon));
+                    }
+
+                    if (!liveMarker) {
+                        liveMarker = L.marker(newLocation, { icon: createArrowIcon(currentHeading) }).addTo(map);
+                        liveMarker.speed = speed;
+                        accuracyCircle = L.circle(newLocation, { radius: acc, color: '#1A73E8', fillColor: '#1A73E8', fillOpacity: 0.15, weight: 1 }).addTo(map);
+                        map.setView(newLocation, 16);
+                    } else {
+                        // ඔටෝ නැවිගේෂන් එකේදී Live GPS එකෙන් ඕවරයිට් වෙන්න දෙන්න එපා
+                        if(!isAutoNavigating) {
+                            liveMarker.speed = speed; 
+                            startLatLng = liveMarker.getLatLng(); targetLatLng = newLocation; startTime = Date.now();
+                            if (!animationFrameId) animationFrameId = requestAnimationFrame(animateMovement);
+                        }
+                        accuracyCircle.setLatLng(newLocation); accuracyCircle.setRadius(acc);
+                    }
+                    lastLatLng = newLocation;
+                    if(!isAutoNavigating) document.getElementById('status').innerText = "🟢 " + Math.round(speed) + " km/h | (±" + Math.round(acc) + "මී)";
+                }, err => { document.getElementById('status').innerText = "❌ GPS Permission දීලා නැද්ද බලන්න!"; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+            }
+        }
+
+        function stopLiveTracking() { if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; } }
+        function recenterMap() { 
+            userInteracting = false; 
+            if (liveMarker) map.setView(liveMarker.getLatLng(), 18, { animate: true }); 
+        }
+
+        window.onload = function() {
+            startLiveTracking();
+            function requestPermission() {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission().then(response => { if (response === 'granted') addOrientationListeners(); }).catch(console.error);
+                } else { addOrientationListeners(); }
+            }
+            document.body.addEventListener('click', requestPermission, { once: true });
+            document.body.addEventListener('touchend', requestPermission, { once: true });
+        };
+
+        function addOrientationListeners() {
+            window.addEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
+            window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+        }
+
+        function handleDeviceOrientation(event) {
+            // ඔටෝ යන වෙලාවට කම්පාස් එකෙන් ඕවරයිට් වෙන්න එපා
+            if (isAutoNavigating) return;
+
+            var compassHeading = null;
+            if (typeof event.webkitCompassHeading !== 'undefined') compassHeading = event.webkitCompassHeading;
+            else if (typeof event.absolute !== 'undefined' && event.absolute && event.alpha !== null) compassHeading = 360 - event.alpha;
+            else if (event.alpha !== null) compassHeading = 360 - event.alpha;
+            if (compassHeading !== null && !isNaN(compassHeading) && (!liveMarker || !liveMarker.speed || liveMarker.speed < 2)) triggerArrowRotation(compassHeading);
+        }
+    </script>
+</body>
+</html>
