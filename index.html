@@ -584,6 +584,29 @@
             else if (event.alpha !== null) compassHeading = 360 - event.alpha;
             if (compassHeading !== null && !isNaN(compassHeading) && (!liveMarker || !liveMarker.speed || liveMarker.speed < 2)) triggerArrowRotation(compassHeading);
         }
+
+        // =========================================================
+        // UNREAL ENGINE එකෙන් කෙලින්ම UPDATE කිරීමට පහත FUNCTION එක භාවිත කරන්න
+        // =========================================================
+        function updateLocation(lat, lng, heading) {
+            var newLocation = L.latLng(lat, lng);
+
+            if (!liveMarker) {
+                liveMarker = L.marker(newLocation, { icon: createArrowIcon(heading || 0) }).addTo(map);
+                map.setView(newLocation, 16);
+            } else {
+                startLatLng = liveMarker.getLatLng();
+                targetLatLng = newLocation;
+                startTime = Date.now();
+                if (!animationFrameId) {
+                    animationFrameId = requestAnimationFrame(animateMovement);
+                }
+            }
+
+            if (heading !== undefined && heading !== null) {
+                triggerArrowRotation(heading);
+            }
+        }
     </script>
 </body>
 </html>
