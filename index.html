@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- WebIntoApp WebView Updates Auto-Load වීම සඳහා Cache Control Meta Tags -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
     <title>හරියටම ගූගල් මැප්ස් වගේ පාර</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
@@ -17,7 +22,6 @@
             width: 100%;
         }
         
-        /* ඩෙස්ක්ටොප් එකේදී පාලන පුවරුව පාවෙන ලෙස සැකසීම */
         @media (min-width: 768px) {
             .controls {
                 position: absolute !important;
@@ -46,10 +50,9 @@
         button { background: #1A73E8; color: white; border: none; }
         button.clear { background: #555; }
         
-        /* Full Screen එකට මැප් එක සැකසීම */
         #map { 
             width: 100vw; 
-            height: 100vh; /* සම්පූර්ණ තිරයේ උසට විහිදේ */
+            height: 100vh; 
             z-index: 0; 
             background: #e5e3df; 
             display: block;
@@ -65,15 +68,9 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;
         }
         
-        /* ඩෙස්ක්ටොප් එකේදී පහළට යාමේ බොත්තම වෙනස් වීම */
         @media (min-width: 768px) {
-            #status {
-                top: 100px;
-            }
-            #recenter-btn {
-                bottom: 30px;
-                right: 30px;
-            }
+            #status { top: 100px; }
+            #recenter-btn { bottom: 30px; right: 30px; }
         }
 
         #recenter-btn {
@@ -132,7 +129,6 @@
     <div id="status">📍 ලයිව් ලොකේෂන්...</div>
     <button id="recenter-btn" onclick="recenterMap()">🧭</button>
 
-    <!-- මැප් එක පෙන්වන තැන -->
     <div id="map"></div>
 
     <input type="file" id="imageInput" accept="image/*" style="display: none;">
@@ -150,7 +146,6 @@
         var liveMarker = null, accuracyCircle = null, userInteracting = false, lastLatLng = null, watchId = null;
         var myPlaces = [], placeMarkers = [], routeLines = [];
         
-        // ඔටෝ යාමට අවශ්‍ය අලුත් Variables
         var isAutoNavigating = false;
         var navPath = [], navIndex = 0, navStartTime = 0, navTotalDuration = 0;
         var navStartLatLng = null, navTargetLatLng = null, navAnimationFrameId = null;
@@ -159,11 +154,8 @@
         var currentHeading = 0, targetHeading = 0, startHeading = 0, headingStartTime = 0, headingDuration = 300, isRotating = false;
         var tempLatLng = null, activeMarkerIndex = null, clickTimeout = null, preventSingleClick = false, hideTimers = {};
 
-        // ----------------------------------------------------
-        // සද්දය නිකුත් කිරීම සඳහා වන ලොජිකය (Web Audio API)
-        // ----------------------------------------------------
         var audioCtx = null;
-        var hasBeepedForTarget = false; // සද්දය දෙවරක් නොඑන්න පාලනය කිරීමට
+        var hasBeepedForTarget = false;
 
         function initAudio() {
             if (!audioCtx) {
@@ -184,11 +176,9 @@
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
 
-            // සද්දයේ වර්ගය සහ තීව්‍රතාවය සකස් කිරීම
             oscillator.type = 'sine'; 
-            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // 880 Hz සද්දයක් (High pitch beep)
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
             
-            // සද්දය ක්‍රමයෙන් අඩු වෙමින් නතර වීම
             gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
 
@@ -196,7 +186,6 @@
             oscillator.stop(audioCtx.currentTime + 0.5);
         }
 
-        // පිටුව ලෝඩ් වූ වහාම audio එක ready කරගැනීම සඳහා
         document.body.addEventListener('click', initAudio, { once: true });
         document.body.addEventListener('touchend', initAudio, { once: true });
 
@@ -344,8 +333,24 @@
         });
 
         // ---------------------------------------------
-        // ගූගල් මැප්ස් වගේ හරියටම පාර අඳින ලොජිකය (Nearest Road Snapping සමඟ)
+        // නිවැරදි OSRM Route Fetching Function එක
         // ---------------------------------------------
+        async function fetchRoute(start, end) {
+            var url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+            var response = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+            
+            if (!response.ok) {
+                throw new Error("HTTP error! status: " + response.status);
+            }
+            
+            var data = await response.json();
+            if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
+                return data.routes[0].geometry;
+            } else {
+                throw new Error("No route found");
+            }
+        }
+
         async function drawPerfectRoute(startLoc, endLoc) {
             document.getElementById('status').style.display = 'block';
             document.getElementById('status').innerText = "🟡 පාර සොයමින්...";
@@ -374,23 +379,22 @@
                 
                 routeLines.push(routeLine);
 
-                // දුර සහ කාලය ගණනය කිරීම (Google Maps වගේ පෙන්වන්න)
                 var totalDistance = 0;
                 for (var i = 0; i < allCoords.length - 1; i++) {
                     totalDistance += map.distance(allCoords[i], allCoords[i + 1]);
                 }
                 var distanceKm = (totalDistance / 1000).toFixed(2);
-                var timeMin = Math.max(1, Math.round((totalDistance / 1000) / 0.4)); // සාමාන්‍ය වේගය 24km/h කින් ගණනය කරයි
+                var timeMin = Math.max(1, Math.round((totalDistance / 1000) / 0.4));
 
                 document.getElementById('status').innerText = `🏁 පාර සාර්ථකයි! දුර: ${distanceKm} km | කාලය: ${timeMin} මිනි.`;
                 setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 3000);
 
-                // ඔටෝ නැවිගේෂන් එක ආරම්භ කිරීම
                 if (liveMarker) {
                     startAutoNavigation(allCoords);
                 }
                 
             } catch (error) {
+                console.error("Route Fetching Error:", error);
                 var straightLine = L.polyline([startLoc, endLoc], {
                     color: '#4caf50', weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round'
                 }).addTo(map);
@@ -405,25 +409,20 @@
             }
         }
 
-        // ---------------------------------------------
-        // ඔටෝ නැවිගේෂන් ලොජිකය (Auto Travel)
-        // ---------------------------------------------
         function startAutoNavigation(pathCoords) {
             isAutoNavigating = true;
             navPath = pathCoords;
             navIndex = 0;
-            hasBeepedForTarget = false; // අලුත් ගමනක් එනවිට beep එක reset කිරීම
-            userInteracting = false; // යාමේදී මැප් එක අත වනලා නොගෙන සෙට් වෙන්න
+            hasBeepedForTarget = false;
+            userInteracting = false;
             map.setView(liveMarker.getLatLng(), 18, { animate: true });
             
             setTimeout(() => {
                 navStartTime = Date.now();
-                // ලක්ෂ්‍ය අතර දුර අනුව කාලය ගණනය කිරීම (තත්පර 1ක් ප්‍රතිචාරීතාවයක්)
                 navTotalDuration = 1000; 
                 navStartLatLng = L.latLng(navPath[0]);
                 navTargetLatLng = L.latLng(navPath[1]);
                 
-                // මුල් දිශාව සකසා ගැනීම
                 var initBearing = getBearing(navStartLatLng.lat, navStartLatLng.lng, navTargetLatLng.lat, navTargetLatLng.lng);
                 triggerArrowRotation(initBearing);
 
@@ -439,7 +438,6 @@
             var elapsed = Date.now() - navStartTime;
             var progress = Math.min(elapsed / navTotalDuration, 1);
             
-            // සුමට චලිතයක් සඳහා (Smooth movement)
             var easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
             
             var currentLat = navStartLatLng.lat + (navTargetLatLng.lat - navStartLatLng.lat) * easeProgress;
@@ -448,21 +446,14 @@
             liveMarker.setLatLng([currentLat, currentLng]);
             if (!userInteracting) map.panTo([currentLat, currentLng], { animate: false });
 
-            // අඟලෙන් අඟලට දිශාව වෙනස් කිරීම
             var dynamicBearing = getBearing(navStartLatLng.lat, navStartLatLng.lng, navTargetLatLng.lat, navTargetLatLng.lng);
             triggerArrowRotation(dynamicBearing);
 
-            // ----------------------------------------------------
-            // අවසාන ස්ථානයට ළඟා වීමට ආසන්න වූ විට සද්දය නිකුත් කිරීම
-            // ----------------------------------------------------
             if (navIndex === navPath.length - 2 && !hasBeepedForTarget) {
-                // දැනට ඇති ස්ථානය සහ අවසාන ස්ථානය අතර දුර මැනීම
                 var distToTarget = map.distance([currentLat, currentLng], navPath[navPath.length - 1]);
-                
-                // මීටර් 30ක් (පමණ) ඇතුළත විට සද්දය නිකුත් වේ
                 if (distToTarget < 30) { 
                     playBeep();
-                    hasBeepedForTarget = true; // දෙවරක් නොඑන්න පාලනය කිරීමට
+                    hasBeepedForTarget = true;
                 }
             }
 
@@ -471,39 +462,22 @@
             } else {
                 navIndex++;
                 if (navIndex < navPath.length - 1) {
-                    // ඊළඟ ලක්ෂ්‍යයට යාම
                     navStartLatLng = L.latLng(navPath[navIndex]);
                     navTargetLatLng = L.latLng(navPath[navIndex + 1]);
                     
-                    // ලක්ෂ්‍ය අතර දුර අනුව වේගය සකස් කිරීම
                     var dist = map.distance(navPath[navIndex], navPath[navIndex + 1]);
-                    navTotalDuration = Math.max(500, dist * 10); // දුර අනුව කාලය වෙනස් වේ
+                    navTotalDuration = Math.max(500, dist * 10);
                     navStartTime = Date.now();
                     
                     navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
                 } else {
-                    // ගමන අවසානය
                     isAutoNavigating = false;
                     navAnimationFrameId = null;
                 }
             }
         }
 
-        function fetchRoute(start, end) {
-            return new Promise((resolve, reject) => {
-                var url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
-                fetch(url).then(r => r.json()).then(data => {
-                    if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
-                        resolve(data.routes[0].geometry);
-                    } else {
-                        reject("No route");
-                    }
-                }).catch(err => reject(err));
-            });
-        }
-
         function clearPlaces() {
-            // ඔටෝ නැවිගේෂන් එකත් නතර කරන්න
             isAutoNavigating = false; 
             if (navAnimationFrameId) cancelAnimationFrame(navAnimationFrameId);
             navAnimationFrameId = null;
@@ -526,7 +500,6 @@
                     var heading = pos.coords.heading, speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
                     var newLocation = L.latLng(lat, lon);
                     
-                    // ඔටෝ නැවිගේෂන් එක නැති විට විතරක් GPS එකෙන් දිශාව ගන්න
                     if(!isAutoNavigating) {
                         if (heading !== null && !isNaN(heading) && speed > 1) triggerArrowRotation(heading);
                         else if (lastLatLng && speed > 1 && lastLatLng.distanceTo(newLocation) > 3) triggerArrowRotation(getBearing(lastLatLng.lat, lastLatLng.lng, lat, lon));
@@ -538,7 +511,6 @@
                         accuracyCircle = L.circle(newLocation, { radius: acc, color: '#1A73E8', fillColor: '#1A73E8', fillOpacity: 0.15, weight: 1 }).addTo(map);
                         map.setView(newLocation, 16);
                     } else {
-                        // ඔටෝ නැවිගේෂන් එකේදී Live GPS එකෙන් ඕවරයිට් වෙන්න දෙන්න එපා
                         if(!isAutoNavigating) {
                             liveMarker.speed = speed; 
                             startLatLng = liveMarker.getLatLng(); targetLatLng = newLocation; startTime = Date.now();
@@ -575,7 +547,6 @@
         }
 
         function handleDeviceOrientation(event) {
-            // ඔටෝ යන වෙලාවට කම්පාස් එකෙන් ඕවරයිට් වෙන්න එපා
             if (isAutoNavigating) return;
 
             var compassHeading = null;
