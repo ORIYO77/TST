@@ -26,7 +26,6 @@ body, html {
     box-shadow: none !important;
 }
 
-/* මැප් එක සම්පූර්ණ තිරයට ගැනීම */
 #map { 
     position: absolute !important;
     top: 0 !important;
@@ -37,7 +36,6 @@ body, html {
     background: #e5e3df !important;
 }
 
-/* පාලන පුවරුව මැප් එක උඩින් පාවෙන ලෙස */
 .controls {
     position: absolute;
     top: 10px;
@@ -56,9 +54,7 @@ body, html {
     box-sizing: border-box;
 }
 @media (min-width: 768px) {
-    .controls {
-        width: auto;
-    }
+    .controls { width: auto; }
 }
 
 .row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -68,15 +64,15 @@ input, button {
 }
 button { background: #1A73E8; color: white; border: none; }
 button.clear { background: #555; }
+button.backup { background: #28a745; }
+button.restore { background: #ffc107; color: black; }
 
 #status {
     position: absolute; top: 140px; left: 50%; transform: translateX(-50%);
     padding: 8px 15px; background: rgba(0, 0, 0, 0.85); color: #fff; 
     font-weight: bold; font-size: 13px; border-radius: 20px; z-index: 1000; white-space: nowrap;
     box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;
-    max-width: 90%;
-    text-overflow: ellipsis;
-    overflow: hidden;
+    max-width: 90%; text-overflow: ellipsis; overflow: hidden;
 }
 
 #recenter-btn {
@@ -86,32 +82,20 @@ button.clear { background: #555; }
 }
 
 .marker-wrapper {
-    position: absolute;
-    width: 120px;
-    height: 160px;
-    bottom: 0; 
-    left: 50%; 
+    position: absolute; width: 120px; height: 160px; bottom: 0; left: 50%; 
     transform: translate(-50%, 100%) scale(var(--zoom-scale, 1)); 
-    transform-origin: center bottom; 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    pointer-events: none; 
+    transform-origin: center bottom; display: flex; flex-direction: column; align-items: center; pointer-events: none; 
 }
-
 .custom-marker-img {
     width: 110px; height: 110px; border-radius: 10px; border: 4px solid #fff; 
     box-shadow: 0 4px 12px rgba(0,0,0,0.7); object-fit: cover; background-color: #eee;
     margin-bottom: -18px; z-index: 1; position: relative;
 }
-
 .custom-pin {
     width: 28px; height: 28px; background: #dc3545; border: 3px solid white;
     border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
     z-index: 2; position: relative; pointer-events: auto; cursor: pointer;
 }
-
-/* නම පෙන්වන ලේබල් එක නිල් පැහැයෙන් සහ සුදු පසුබිමෙන් */
 .marker-name-label {
     background: #ffffff; color: #1A73E8; padding: 6px 12px; border-radius: 14px;
     font-size: 15px; font-weight: bold; margin-bottom: -12px; z-index: 1; position: relative;
@@ -119,19 +103,21 @@ button.clear { background: #555; }
 }
 </style>
 
-<!-- මැප් එක පෙන්වන තැන -->
 <div id="map"></div>
 
-<!-- පාලන බොත්තම් -->
 <div class="controls">
     <div class="row">
-        <p style="margin:0; font-size:13px; font-weight:bold; color: #d35400;">පොයින්ට් අතර ගූගල් මැප්ස් වගේ හරියටම පාර අඳියි.</p>
+        <p style="margin:0; font-size:13px; font-weight:bold; color: #d35400;">පොයින්ට් අතර ගූගල් මැප්ස් වගේ හරියටම පාර අඳියි. (Hold 3s to Delete)</p>
     </div>
     <div class="row">
         <input type="text" id="placeName" placeholder="ස්ථානයේ නම" style="flex: 1; max-width: 200px; min-width: 120px;">
         <input type="number" id="hideTime" placeholder="Hidden වේලාව" style="width: 100px;" value="3" min="1" max="30">
         <button onclick="addPlace()">📍 ස්ථානය එක් කරන්න</button>
-        <button onclick="clearPlaces()" class="clear">🗑️ මකන්න</button>
+        <button onclick="clearPlaces()" class="clear">🗑️ සියල්ල මකන්න</button>
+    </div>
+    <div class="row">
+        <button onclick="exportData()" class="backup">📤 Backup (File එක ගන්න)</button>
+        <button onclick="document.getElementById('importFile').click()" class="restore">📥 Restore (File එක දාන්න)</button>
     </div>
 </div>
 
@@ -140,22 +126,17 @@ button.clear { background: #555; }
 
 <input type="file" id="imageInput" accept="image/*" style="display: none;">
 <input type="file" id="imageChangeInput" accept="image/*" style="display: none;">
+<input type="file" id="importFile" accept=".txt,.json" style="display: none;">
 
-<!-- අවශ්‍ය JavaScript Libraries -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 function initMapApp() {
     var map = L.map('map', {
-        zoomControl: false, attributionControl: false,
-        doubleClickZoom: false, inertia: true, inertiaDeceleration: 2000, zoomAnimation: true,
-        keepBuffer: 2, 
-        updateWhenZooming: false 
+        zoomControl: false, attributionControl: false, doubleClickZoom: false, inertia: true, inertiaDeceleration: 2000, zoomAnimation: true, keepBuffer: 2, updateWhenZooming: false 
     }).setView([7.8731, 80.7718], 7);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 20
-    }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
     var liveMarker = null, accuracyCircle = null, userInteracting = false, lastLatLng = null, watchId = null;
     var myPlaces = [], placeMarkers = [], routeLines = [];
@@ -171,43 +152,116 @@ function initMapApp() {
     var audioCtx = null;
     var hasBeepedForTarget = false; 
     var latestExactLocation = null;
+    
+    // Long Press (3s) සඳහා Variables
+    var pressTimer = null;
+    var isLongPress = false;
 
     function initAudio() {
-        if (!audioCtx) {
-            try {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            } catch(e) { console.error("Audio not supported"); }
-        }
-        if (audioCtx && audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
+        if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
-
-    function playBeep() {
+    
+    // Beep Sound මන්දගාමී (Slow) විදිහට වාර 6ක් නාද වීම
+    function playBeepMultiple(times) {
         if (!audioCtx) return;
-        var oscillator = audioCtx.createOscillator();
-        var gainNode = audioCtx.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.type = 'sine'; 
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
-        gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
-        oscillator.start(audioCtx.currentTime);
-        oscillator.stop(audioCtx.currentTime + 0.5);
+        for (var i = 0; i < times; i++) {
+            setTimeout(function() {
+                var oscillator = audioCtx.createOscillator();
+                var gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.type = 'sine'; 
+                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
+                gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4); // තත්පර 0.4ක් නාද වේ
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.4);
+            }, i * 600); // තත්පර 0.6ක විරාමයකින් නාද වේ (Slow)
+        }
     }
 
     document.body.addEventListener('click', initAudio, { once: true });
     document.body.addEventListener('touchend', initAudio, { once: true });
 
-    // ----------------------------------------------------
-    // Save & Load Logic (Local Storage)
-    // ----------------------------------------------------
     function savePlaces() {
         try {
             localStorage.setItem('myMapPlaces', JSON.stringify(myPlaces));
         } catch(e) {
             console.error("Storage limit exceeded", e);
+            alert("දුරකථනයේ මතකය පිරී ඇත. ඡායාරූප ගොනු කර Backup ගන්න.");
+        }
+    }
+
+    function renderPlaces() {
+        placeMarkers.forEach(m => map.removeLayer(m)); placeMarkers = [];
+        routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
+        
+        myPlaces.forEach(function(place, index) {
+            var marker = L.marker(place.latlng, { icon: L.divIcon({ html: `<div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }) }).addTo(map);
+            
+            if (place.hasImage) {
+                marker.setIcon(createImageIcon(place.imageSrc));
+            } else {
+                marker.setIcon(createNameIcon(place.name));
+            }
+
+            placeMarkers.push(marker);
+            var markerIndex = index; 
+
+            // Touch Hold 3 seconds to delete marker
+            function startPressTimer() {
+                isLongPress = false;
+                pressTimer = setTimeout(function() {
+                    isLongPress = true;
+                    deletePlace(markerIndex);
+                }, 3000);
+            }
+            function clearPressTimer() {
+                if (pressTimer) {
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
+            }
+
+            marker.on('mousedown touchstart', function(e) {
+                if(e.originalEvent.target.classList.contains('custom-pin')) {
+                    startPressTimer();
+                }
+            });
+            marker.on('mouseup mouseout touchend touchcancel', clearPressTimer);
+
+            marker.on('click', function(e) {
+                if(e.originalEvent.target.classList.contains('custom-pin')) {
+                    L.DomEvent.stopPropagation(e);
+                    if (isLongPress) { isLongPress = false; return; } // If it was a long press, ignore the click
+                    if (preventSingleClick) { preventSingleClick = false; return; }
+                    clickTimeout = setTimeout(function() { handleSingleClick(markerIndex); }, 300);
+                }
+            });
+            marker.on('dblclick', function(e) {
+                if(e.originalEvent.target.classList.contains('custom-pin')) {
+                    L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
+                    clearTimeout(clickTimeout); preventSingleClick = true; handleDoubleClick(markerIndex);
+                }
+            });
+
+            if (index > 0) {
+                drawPerfectRoute(myPlaces[index - 1].latlng, place.latlng, false);
+            }
+        });
+        setTimeout(updateMarkerScales, 50);
+    }
+
+    // Marker එකක් මකාදැමීම සඳහා වන ක්‍රියාවලිය
+    function deletePlace(index) {
+        if (confirm("මෙම ස්ථානය '" + myPlaces[index].name + "' මකාදැමීමට අවශ්‍යද?")) {
+            myPlaces.splice(index, 1); // දත්ත අඩංගු ලැයිස්තුවෙන් ඉවත් කිරීම
+            savePlaces();
+            renderPlaces(); // මැප් එක යළි ගොඩනැගීම
+            document.getElementById('status').innerText = "🗑️ ස්ථානය මකාදමා ඇත.";
+            document.getElementById('status').style.display = 'block';
+            setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
         }
     }
 
@@ -215,42 +269,57 @@ function initMapApp() {
         var saved = localStorage.getItem('myMapPlaces');
         if (saved) {
             myPlaces = JSON.parse(saved);
-            myPlaces.forEach(function(place, index) {
-                var icon = (place.hasImage) ? createImageIcon(place.imageSrc) : createNameIcon(place.name);
-                var marker = L.marker(place.latlng, { icon: L.divIcon({ html: `<div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }) }).addTo(map);
-                
-                // ඡායාරූපයක් තිබුණු නම් ඒක පෙන්වන්න, නැත්නම් නම පෙන්වන්න
-                if (place.hasImage) {
-                    marker.setIcon(createImageIcon(place.imageSrc));
-                } else {
-                    marker.setIcon(createNameIcon(place.name));
-                }
-
-                placeMarkers.push(marker);
-                var markerIndex = index; 
-
-                marker.on('click', function(e) {
-                    if(e.originalEvent.target.classList.contains('custom-pin')) {
-                        L.DomEvent.stopPropagation(e);
-                        if (preventSingleClick) { preventSingleClick = false; return; }
-                        clickTimeout = setTimeout(function() { handleSingleClick(markerIndex); }, 300);
-                    }
-                });
-                marker.on('dblclick', function(e) {
-                    if(e.originalEvent.target.classList.contains('custom-pin')) {
-                        L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
-                        clearTimeout(clickTimeout); preventSingleClick = true; handleDoubleClick(markerIndex);
-                    }
-                });
-
-                // සුරැකි ස්ථාන අතර පාරවල් නැවත අඳින්න (ඔටෝ නැවිගේෂන් එකකින් තොරව)
-                if (index > 0) {
-                    drawPerfectRoute(myPlaces[index - 1].latlng, place.latlng, false);
-                }
-            });
-            setTimeout(updateMarkerScales, 50);
+            renderPlaces();
         }
     }
+
+    window.exportData = function() {
+        if (myPlaces.length === 0) { alert("කරුණාකර මුලින්ම ස්ථානයක් එක් කරන්න."); return; }
+        var dataStr = JSON.stringify(myPlaces);
+        var dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+        var exportFileDefaultName = 'map_data.txt';
+        
+        var linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+    };
+
+    // Restore කිරීමේදී අලුත් දත්ත එකතු කිරීම සහ ඡායාරූප තත්පර 6ක් පෙන්වීම
+    document.getElementById('importFile').addEventListener('change', function(event) {
+        var file = event.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var importedPlaces = JSON.parse(e.target.result);
+                myPlaces = myPlaces.concat(importedPlaces); 
+                savePlaces();
+                renderPlaces();
+                
+                // Restore කළ සැණෙහි සියලුම ඡායාරූප තත්පර 6ක් පෙන්වීම
+                for (var i = 0; i < myPlaces.length; i++) {
+                    if (myPlaces[i].hasImage && placeMarkers[i]) {
+                        myPlaces[i].isVisible = true;
+                        placeMarkers[i].setIcon(createImageIcon(myPlaces[i].imageSrc));
+                        
+                        setTimeout(function(idx) {
+                            if (myPlaces[idx] && placeMarkers[idx]) {
+                                myPlaces[idx].isVisible = false;
+                                placeMarkers[idx].setIcon(createNameIcon(myPlaces[idx].name));
+                            }
+                        }, 6000, i);
+                    }
+                }
+                
+                alert("✅ අලුත් ස්ථාන සාර්ථකව එකතු විය! ඡායාරූප තත්පර 6ක් පෙන්වන ලදී.");
+            } catch(err) {
+                alert("❌ වැරදි File එකක්. කරුණාකර ඔබ Backup ගත්තු File එකම තෝරන්න.");
+            }
+        };
+        reader.readAsText(file);
+        this.value = "";
+    });
 
     map.on('dragstart zoomstart', function() { userInteracting = true; });
 
@@ -265,14 +334,10 @@ function initMapApp() {
     map.on('zoomend', updateMarkerScales);
 
     function createArrowIcon(heading) {
-        return L.divIcon({ 
-            html: `<svg width="50" height="50" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${heading}deg);"><path d="M50 5 L85 95 L50 78 L15 95 Z" fill="#1A73E8" stroke="white" stroke-width="6" stroke-linejoin="round"/><circle cx="50" cy="50" r="5" fill="white" opacity="0.9"/></svg>`, 
-            className: '', iconSize: [50, 50], iconAnchor: [25, 25] 
-        });
+        return L.divIcon({ html: `<svg width="50" height="50" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${heading}deg);"><path d="M50 5 L85 95 L50 78 L15 95 Z" fill="#1A73E8" stroke="white" stroke-width="6" stroke-linejoin="round"/><circle cx="50" cy="50" r="5" fill="white" opacity="0.9"/></svg>`, className: '', iconSize: [50, 50], iconAnchor: [25, 25] });
     }
 
     function getShortestAngleDiff(start, end) { var diff = end - start; if (diff > 180) diff -= 360; if (diff < -180) diff += 360; return diff; }
-    
     function getBearing(lat1, lon1, lat2, lon2) {
         var dLon = (lon2 - lon1) * Math.PI / 180; lat1 = lat1 * Math.PI / 180; lat2 = lat2 * Math.PI / 180;
         var y = Math.sin(dLon) * Math.cos(lat2);
@@ -292,7 +357,6 @@ function initMapApp() {
         }
         if (progress < 1) { animationFrameId = requestAnimationFrame(animateMovement); } else { animationFrameId = null; }
     }
-
     function animateRotation() {
         var hElapsed = Date.now() - headingStartTime;
         var hProgress = Math.min(hElapsed / headingDuration, 1);
@@ -303,7 +367,6 @@ function initMapApp() {
         if (liveMarker) liveMarker.setIcon(createArrowIcon(currentHeading));
         if (hProgress < 1) { requestAnimationFrame(animateRotation); } else { isRotating = false; }
     }
-
     function triggerArrowRotation(newHeading) {
         if (Math.abs(getShortestAngleDiff(currentHeading, newHeading)) < 2) return;
         startHeading = currentHeading; targetHeading = newHeading; headingStartTime = Date.now();
@@ -322,41 +385,21 @@ function initMapApp() {
         if (!tempLatLng) { alert("කරුණාකර මුලින්ම මැප් එකේ හිස් තැනක් අත තදන්න."); return; }
         if (!name) name = "ස්ථානය " + (myPlaces.length + 1);
 
-        var marker = L.marker(tempLatLng, { icon: L.divIcon({ html: `<div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }) }).addTo(map);
-        var markerIndex = myPlaces.length; 
         myPlaces.push({ latlng: tempLatLng, name: name, id: myPlaces.length + 1, hasImage: false, imageSrc: "", hideTime: timeToHide, isVisible: false });
-        placeMarkers.push(marker);
-
-        marker.on('click', function(e) {
-            if(e.originalEvent.target.classList.contains('custom-pin')) {
-                L.DomEvent.stopPropagation(e);
-                if (preventSingleClick) { preventSingleClick = false; return; }
-                clickTimeout = setTimeout(function() { handleSingleClick(markerIndex); }, 300);
-            }
-        });
-        marker.on('dblclick', function(e) {
-            if(e.originalEvent.target.classList.contains('custom-pin')) {
-                L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
-                clearTimeout(clickTimeout); preventSingleClick = true; handleDoubleClick(markerIndex);
-            }
-        });
-
-        setTimeout(updateMarkerScales, 50);
+        
+        renderPlaces(); 
+        
         var startPoint, endPoint = tempLatLng;
         if (myPlaces.length === 1) { startPoint = liveMarker ? liveMarker.getLatLng() : map.getCenter(); } else { startPoint = myPlaces[myPlaces.length - 2].latlng; }
         
         drawPerfectRoute(startPoint, endPoint, true);
         tempLatLng = null; document.getElementById('placeName').value = "";
         
-        savePlaces(); // අලුතින් දාපු තැන සුරකින්න
+        savePlaces(); 
     }
 
-    function createImageIcon(src) {
-        return L.divIcon({ html: `<img src="${src}" class="custom-marker-img"><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] });
-    }
-    function createNameIcon(name) {
-        return L.divIcon({ html: `<div class="marker-name-label">${name}</div><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] });
-    }
+    function createImageIcon(src) { return L.divIcon({ html: `<img src="${src}" class="custom-marker-img"><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }); }
+    function createNameIcon(name) { return L.divIcon({ html: `<div class="marker-name-label">${name}</div><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }); }
 
     function handleSingleClick(index) {
         var placeData = myPlaces[index];
@@ -382,33 +425,48 @@ function initMapApp() {
         showImage(index); document.getElementById('imageChangeInput').dataset.markerIndex = index; document.getElementById('imageChangeInput').click();
     }
 
+    function compressImage(file, callback) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = new Image();
+            img.onload = function() {
+                var canvas = document.createElement('canvas');
+                var ctx = canvas.getContext('2d');
+                var MAX_SIZE = 300;
+                var width = img.width, height = img.height;
+                if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
+                else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+                canvas.width = width; canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                callback(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
     document.getElementById('imageInput').addEventListener('change', function(event) {
         var file = event.target.files[0], index = parseInt(this.dataset.markerIndex);
         if (isNaN(index) || !file) return;
-        var reader = new FileReader();
-        reader.onload = function(e) { 
+        compressImage(file, function(dataUrl) {
             myPlaces[index].hasImage = true; 
-            myPlaces[index].imageSrc = e.target.result; 
+            myPlaces[index].imageSrc = dataUrl; 
             showImage(index); 
-            savePlaces(); // ඡායාරූපය සුරකින්න
-            this.value = ""; 
-        }.bind(this);
-        reader.readAsDataURL(file);
+            savePlaces(); 
+        });
+        this.value = ""; 
     });
     document.getElementById('imageChangeInput').addEventListener('change', function(event) {
         var file = event.target.files[0], index = parseInt(this.dataset.markerIndex);
         if (isNaN(index) || !file) return;
-        var reader = new FileReader();
-        reader.onload = function(e) { 
-            myPlaces[index].imageSrc = e.target.result; 
+        compressImage(file, function(dataUrl) {
+            myPlaces[index].imageSrc = dataUrl; 
             showImage(index); 
-            savePlaces(); // ඡායාරූපය වෙනස් කර සුරකින්න
-            this.value = ""; 
-        }.bind(this);
-        reader.readAsDataURL(file);
+            savePlaces(); 
+        });
+        this.value = ""; 
     });
 
-    // doNavigate එක true නම් වාහනය යයි, false නම් වාහනය යන්නේ නැතිව පාර පෙන්වයි
     async function drawPerfectRoute(startLoc, endLoc, doNavigate = true) {
         document.getElementById('status').style.display = 'block';
         document.getElementById('status').innerText = "🟡 පාර සොයමින්...";
@@ -416,154 +474,88 @@ function initMapApp() {
         try {
             var routeData = await fetchRoute(startLoc, endLoc);
             var routeCoords = routeData.coordinates.map(c => [c[1], c[0]]);
-            
-            var snappedStart = routeCoords[0];
-            var snappedEnd = routeCoords[routeCoords.length - 1];
-
             var allCoords = [];
             allCoords.push([startLoc.lat, startLoc.lng]);
-            allCoords.push(snappedStart);
-
-            for (var i = 1; i < routeCoords.length; i++) {
-                allCoords.push(routeCoords[i]);
-            }
-
+            allCoords.push(routeCoords[0]);
+            for (var i = 1; i < routeCoords.length; i++) { allCoords.push(routeCoords[i]); }
             allCoords.push([endLoc.lat, endLoc.lng]);
             
-            var routeLine = L.polyline(allCoords, {
-                color: '#4caf50', weight: 6, opacity: 0.8,
-                lineCap: 'round', lineJoin: 'round'
-            }).addTo(map);
-            
+            var routeLine = L.polyline(allCoords, { color: '#4caf50', weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round' }).addTo(map);
             routeLines.push(routeLine);
 
             if (doNavigate) {
                 var totalDistance = 0;
-                for (var i = 0; i < allCoords.length - 1; i++) {
-                    totalDistance += map.distance(allCoords[i], allCoords[i + 1]);
-                }
+                for (var i = 0; i < allCoords.length - 1; i++) { totalDistance += map.distance(allCoords[i], allCoords[i + 1]); }
                 var distanceKm = (totalDistance / 1000).toFixed(2);
                 var timeMin = Math.max(1, Math.round((totalDistance / 1000) / 0.4)); 
-
                 document.getElementById('status').innerText = `🏁 පාර සාර්ථකයි! දුර: ${distanceKm} km | කාලය: ${timeMin} මිනි.`;
                 setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 3000);
-
-                if (liveMarker) {
-                    startAutoNavigation(allCoords);
-                }
+                if (liveMarker) startAutoNavigation(allCoords);
             }
-            
         } catch (error) {
-            var straightLine = L.polyline([startLoc, endLoc], {
-                color: '#4caf50', weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round'
-            }).addTo(map);
-            
+            var straightLine = L.polyline([startLoc, endLoc], { color: '#4caf50', weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round' }).addTo(map);
             routeLines.push(straightLine);
             if (doNavigate) {
-                document.getElementById('status').innerText = "⚠️ පාරක් හමු නොවීය (සෘජු පේළියක් අඳින ලදි)";
+                document.getElementById('status').innerText = "⚠️ පාරක් හමු නොවීය";
                 setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
-                
-                if (liveMarker) {
-                    startAutoNavigation([[startLoc.lat, startLoc.lng], [endLoc.lat, endLoc.lng]]);
-                }
+                if (liveMarker) startAutoNavigation([[startLoc.lat, startLoc.lng], [endLoc.lat, endLoc.lng]]);
             }
         }
     }
 
     function startAutoNavigation(pathCoords) {
-        isAutoNavigating = true;
-        navPath = pathCoords;
-        navIndex = 0;
-        hasBeepedForTarget = false; 
-        userInteracting = false; 
+        isAutoNavigating = true; navPath = pathCoords; navIndex = 0; hasBeepedForTarget = false; userInteracting = false; 
         map.setView(liveMarker.getLatLng(), 18, { animate: true });
-        
         setTimeout(() => {
-            navStartTime = Date.now();
-            navTotalDuration = 1000; 
-            navStartLatLng = L.latLng(navPath[0]);
-            navTargetLatLng = L.latLng(navPath[1]);
-            
-            var initBearing = getBearing(navStartLatLng.lat, navStartLatLng.lng, navTargetLatLng.lat, navTargetLatLng.lng);
-            triggerArrowRotation(initBearing);
-
-            if (!navAnimationFrameId) {
-                navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
-            }
+            navStartTime = Date.now(); navTotalDuration = 1000; 
+            navStartLatLng = L.latLng(navPath[0]); navTargetLatLng = L.latLng(navPath[1]);
+            triggerArrowRotation(getBearing(navStartLatLng.lat, navStartLatLng.lng, navTargetLatLng.lat, navTargetLatLng.lng));
+            if (!navAnimationFrameId) navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
         }, 1000);
     }
-
     function animateAutoNavigation() {
         if (!isAutoNavigating || !liveMarker) return;
-
-        var elapsed = Date.now() - navStartTime;
-        var progress = Math.min(elapsed / navTotalDuration, 1);
-        
+        var elapsed = Date.now() - navStartTime, progress = Math.min(elapsed / navTotalDuration, 1);
         var easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-        
         var currentLat = navStartLatLng.lat + (navTargetLatLng.lat - navStartLatLng.lat) * easeProgress;
         var currentLng = navStartLatLng.lng + (navTargetLatLng.lng - navStartLatLng.lng) * easeProgress;
-        
         liveMarker.setLatLng([currentLat, currentLng]);
         if (!userInteracting) map.panTo([currentLat, currentLng], { animate: false });
-
-        var dynamicBearing = getBearing(navStartLatLng.lat, navStartLatLng.lng, navTargetLatLng.lat, navTargetLatLng.lng);
-        triggerArrowRotation(dynamicBearing);
-
+        triggerArrowRotation(getBearing(navStartLatLng.lat, navStartLatLng.lng, navTargetLatLng.lat, navTargetLatLng.lng));
+        
         if (navIndex === navPath.length - 2 && !hasBeepedForTarget) {
             var distToTarget = map.distance([currentLat, currentLng], navPath[navPath.length - 1]);
             if (distToTarget < 30) { 
-                playBeep();
+                playBeepMultiple(6); 
                 hasBeepedForTarget = true; 
             }
         }
-
-        if (progress < 1) {
-            navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
-        } else {
+        
+        if (progress < 1) navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
+        else {
             navIndex++;
             if (navIndex < navPath.length - 1) {
-                navStartLatLng = L.latLng(navPath[navIndex]);
-                navTargetLatLng = L.latLng(navPath[navIndex + 1]);
-                
-                var dist = map.distance(navPath[navIndex], navPath[navIndex + 1]);
-                navTotalDuration = Math.max(500, dist * 10); 
-                navStartTime = Date.now();
-                
-                navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
-            } else {
-                isAutoNavigating = false;
-                navAnimationFrameId = null;
-            }
+                navStartLatLng = L.latLng(navPath[navIndex]); navTargetLatLng = L.latLng(navPath[navIndex + 1]);
+                navTotalDuration = Math.max(500, map.distance(navPath[navIndex], navPath[navIndex + 1]) * 10);
+                navStartTime = Date.now(); navAnimationFrameId = requestAnimationFrame(animateAutoNavigation);
+            } else { isAutoNavigating = false; navAnimationFrameId = null; }
         }
     }
-
     function fetchRoute(start, end) {
         return new Promise((resolve, reject) => {
             var url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
             fetch(url).then(r => r.json()).then(data => {
-                if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
-                    resolve(data.routes[0].geometry);
-                } else {
-                    reject("No route");
-                }
+                if (data.routes && data.routes.length > 0 && data.routes[0].geometry) resolve(data.routes[0].geometry);
+                else reject("No route");
             }).catch(err => reject(err));
         });
     }
 
     window.clearPlaces = function() {
-        isAutoNavigating = false; 
-        if (navAnimationFrameId) cancelAnimationFrame(navAnimationFrameId);
-        navAnimationFrameId = null;
-
-        myPlaces = [];
-        placeMarkers.forEach(m => map.removeLayer(m)); placeMarkers = [];
-        routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
-        activeMarkerIndex = null;
-        for (var key in hideTimers) clearTimeout(hideTimers[key]);
-        hideTimers = {};
-        
-        localStorage.removeItem('myMapPlaces'); // සුරැකි දත්ත මකාදමන්න
+        isAutoNavigating = false; if (navAnimationFrameId) cancelAnimationFrame(navAnimationFrameId); navAnimationFrameId = null;
+        myPlaces = []; placeMarkers.forEach(m => map.removeLayer(m)); placeMarkers = []; routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
+        activeMarkerIndex = null; for (var key in hideTimers) clearTimeout(hideTimers[key]); hideTimers = {};
+        localStorage.removeItem('myMapPlaces'); 
     };
 
     function startLiveTracking() { 
@@ -574,15 +566,11 @@ function initMapApp() {
             watchId = navigator.geolocation.watchPosition(pos => {
                 var lat = pos.coords.latitude, lon = pos.coords.longitude, acc = pos.coords.accuracy;
                 var heading = pos.coords.heading, speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
-                var newLocation = L.latLng(lat, lon);
-                
-                latestExactLocation = newLocation; 
-                
+                var newLocation = L.latLng(lat, lon); latestExactLocation = newLocation; 
                 if(!isAutoNavigating) {
                     if (heading !== null && !isNaN(heading) && speed > 1) triggerArrowRotation(heading);
                     else if (lastLatLng && speed > 1 && lastLatLng.distanceTo(newLocation) > 3) triggerArrowRotation(getBearing(lastLatLng.lat, lastLatLng.lng, lat, lon));
                 }
-
                 if (!liveMarker) {
                     liveMarker = L.marker(newLocation, { icon: createArrowIcon(currentHeading) }).addTo(map);
                     liveMarker.speed = speed;
@@ -590,38 +578,27 @@ function initMapApp() {
                     map.setView(newLocation, 16);
                 } else {
                     if(!isAutoNavigating) {
-                        liveMarker.speed = speed; 
-                        startLatLng = liveMarker.getLatLng(); targetLatLng = newLocation; startTime = Date.now();
+                        liveMarker.speed = speed; startLatLng = liveMarker.getLatLng(); targetLatLng = newLocation; startTime = Date.now();
                         if (!animationFrameId) animationFrameId = requestAnimationFrame(animateMovement);
                     }
                     accuracyCircle.setLatLng(newLocation); accuracyCircle.setRadius(acc);
                 }
                 lastLatLng = newLocation;
                 if(!isAutoNavigating) document.getElementById('status').innerText = "🟢 " + Math.round(speed) + " km/h | (±" + Math.round(acc) + "මී)";
-            }, err => { 
-                document.getElementById('status').innerText = "❌ GPS Permission දීලා නැද්ද බලන්න!"; 
-            }, { 
-                enableHighAccuracy: true, 
-                timeout: 10000, 
-                maximumAge: 0 
-            });
+            }, err => { document.getElementById('status').innerText = "❌ GPS Permission දීලා නැද්ද බලන්න!"; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
         }
     }
 
     window.recenterMap = function() { 
         userInteracting = false; 
-        if (latestExactLocation) {
-            if (liveMarker) liveMarker.setLatLng(latestExactLocation);
-            map.setView(latestExactLocation, 18, { animate: true });
-        } else if (liveMarker) {
-            map.setView(liveMarker.getLatLng(), 18, { animate: true }); 
-        }
+        if (latestExactLocation) { if (liveMarker) liveMarker.setLatLng(latestExactLocation); map.setView(latestExactLocation, 18, { animate: true }); } 
+        else if (liveMarker) map.setView(liveMarker.getLatLng(), 18, { animate: true }); 
     };
 
     window.addPlace = addPlace;
 
     startLiveTracking();
-    loadPlaces(); // පිටුව ලෝඩ් වූ විට සුරැකි ස්ථාන නැවත ගෙන පෙන්වන්න
+    loadPlaces(); 
 
     function requestPermission() {
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -630,15 +607,12 @@ function initMapApp() {
     }
     document.body.addEventListener('click', requestPermission, { once: true });
     document.body.addEventListener('touchend', requestPermission, { once: true });
-
     function addOrientationListeners() {
         window.addEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
         window.addEventListener('deviceorientation', handleDeviceOrientation, true);
     }
-
     function handleDeviceOrientation(event) {
         if (isAutoNavigating) return;
-
         var compassHeading = null;
         if (typeof event.webkitCompassHeading !== 'undefined') compassHeading = event.webkitCompassHeading;
         else if (typeof event.absolute !== 'undefined' && event.absolute && event.alpha !== null) compassHeading = 360 - event.alpha;
@@ -647,9 +621,6 @@ function initMapApp() {
     }
 }
 
-if (window.addEventListener) {
-    window.addEventListener('load', initMapApp);
-} else {
-    window.attachEvent('onload', initMapApp);
-}
+if (window.addEventListener) window.addEventListener('load', initMapApp);
+else window.attachEvent('onload', initMapApp);
 </script>
