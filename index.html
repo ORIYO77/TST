@@ -19,7 +19,6 @@ body, html {
     width: 100% !important;
     overflow: hidden !important;
     background: #e5e3df !important;
-    /* Mobile එකේ Safe area වලට හරියන්න */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .content-outer, .content-inner, .main-outer, .main-inner, .post-outer, .post-body, .widget-content, .entry-content {
@@ -42,7 +41,6 @@ body, html {
     background: #e5e3df !important;
 }
 
-/* Mobile එකට හොඳ Touch Friendly Controls */
 .controls {
     position: absolute;
     top: 10px;
@@ -68,7 +66,7 @@ body, html {
 input, button {
     padding: 12px 15px; font-size: 15px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer;
     box-sizing: border-box;
-    min-height: 44px; /* Mobile Touch Target Size */
+    min-height: 44px; 
     -webkit-tap-highlight-color: transparent;
 }
 input { flex: 1; min-width: 100px; }
@@ -86,7 +84,7 @@ button.restore { background: #ffc107; color: black; }
 }
 
 #recenter-btn {
-    position: absolute; bottom: 25px; right: 20px; width: 56px; height: 56px; /* ටිකක් ලොකුවට */
+    position: absolute; bottom: 25px; right: 20px; width: 56px; height: 56px; 
     background: #fff; border: none; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
     font-size: 26px; cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center;
     -webkit-tap-highlight-color: transparent;
@@ -164,7 +162,6 @@ function initMapApp() {
     var hasBeepedForTarget = false; 
     var latestExactLocation = null;
     
-    // Long Press (3s) සඳහා Variables
     var pressTimer = null;
     var isLongPress = false;
 
@@ -173,7 +170,6 @@ function initMapApp() {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
     
-    // Beep Sound මන්දගාමී (Slow) විදිහට වාර 6ක් නාද වීම
     function playBeepMultiple(times) {
         if (!audioCtx) return;
         for (var i = 0; i < times; i++) {
@@ -211,31 +207,50 @@ function initMapApp() {
         myPlaces.forEach(function(place, index) {
             var marker = L.marker(place.latlng, { icon: L.divIcon({ html: `<div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }) }).addTo(map);
             
-            // ඡායාරූපයක් තිබුණත් නැතත් මුලින්ම නම (Label) පමණක් පෙන්වයි. Image එක සැඟවේ.
             place.isVisible = false;
             marker.setIcon(createNameIcon(place.name));
 
             placeMarkers.push(marker);
             var markerIndex = index; 
 
-            // Mobile Touch සඳහා හරියටම Long Press හඳුනාගැනීම
-            marker.on('mousedown touchstart', function(e) {
-                L.DomEvent.stopPropagation(e);
-                L.DomEvent.preventDefault(e);
-                isLongPress = false;
-                pressTimer = setTimeout(function() {
-                    isLongPress = true;
-                    deletePlace(markerIndex);
-                }, 3000);
-            });
-            
-            // අත සෙලවූ විට (Map Drag කළ විට) Timer එක නතර කිරීම
-            marker.on('mouseup mouseout touchend touchcancel touchmove dragstart', function(e) {
-                if (pressTimer) {
-                    clearTimeout(pressTimer);
-                    pressTimer = null;
+            // Mobile Touch සඳහා හරියටම Long Press හඳුනාගැනීම (Native Events භාවිතා කරයි)
+            function attachLongPress() {
+                var el = marker.getElement();
+                if (!el) {
+                    setTimeout(attachLongPress, 50);
+                    return;
                 }
-            });
+
+                var startPress = function(e) {
+                    if (e.button === 2) return; // Ignore right click
+                    isLongPress = false;
+                    pressTimer = setTimeout(function() {
+                        isLongPress = true;
+                        if (navigator.vibrate) navigator.vibrate(100); // දුරකථනය කම්පනය (Vibrate)
+                        deletePlace(markerIndex);
+                    }, 3000);
+                };
+                
+                var cancelPress = function() {
+                    if (pressTimer) {
+                        clearTimeout(pressTimer);
+                        pressTimer = null;
+                    }
+                };
+                
+                // ජංගම දුරකථන සඳහා Touch Events
+                el.addEventListener('touchstart', startPress, { passive: true, capture: true });
+                el.addEventListener('touchend', cancelPress, { capture: true });
+                el.addEventListener('touchcancel', cancelPress, { capture: true });
+                el.addEventListener('touchmove', cancelPress, { capture: true });
+                
+                // Desktop සඳහා Mouse Events
+                el.addEventListener('mousedown', startPress, { capture: true });
+                el.addEventListener('mouseup', cancelPress, { capture: true });
+                el.addEventListener('mouseleave', cancelPress, { capture: true });
+            }
+            
+            attachLongPress();
 
             marker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
@@ -263,7 +278,6 @@ function initMapApp() {
         setTimeout(updateMarkerScales, 50);
     }
 
-    // Marker එකක් මකාදැමීම සඳහා වන ක්‍රියාවලිය
     function deletePlace(index) {
         if (confirm("මෙම ස්ථානය '" + myPlaces[index].name + "' මකාදැමීමට අවශ්‍යද?")) {
             myPlaces.splice(index, 1); 
@@ -295,7 +309,6 @@ function initMapApp() {
         linkElement.click();
     };
 
-    // Restore කිරීමේදී අලුත් දත්ත එකතු කිරීම (ඡායාරූප එකවර පෙන්වන්නේ නැත)
     document.getElementById('importFile').addEventListener('change', function(event) {
         var file = event.target.files[0];
         if (!file) return;
@@ -395,7 +408,6 @@ function initMapApp() {
     function createImageIcon(src) { return L.divIcon({ html: `<img src="${src}" class="custom-marker-img"><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }); }
     function createNameIcon(name) { return L.divIcon({ html: `<div class="marker-name-label">${name}</div><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }); }
 
-    // Click කළ විට පමණක් ඡායාරූපය පෙන්වා පසුව සැඟවීම
     function handleSingleClick(index) {
         var placeData = myPlaces[index];
         if (!placeData.hasImage) { document.getElementById('imageInput').dataset.markerIndex = index; document.getElementById('imageInput').click(); return; }
