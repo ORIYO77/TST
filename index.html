@@ -1,3 +1,7 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+
 <style>
 /* Blogger එකේ අනවශ්‍ය දේවල් සහ Header/Footer මකාදැමීමට */
 #header, #footer, .header-outer, .footer-outer, .navbar, .widget, .blog-pager, .post-footer, .post-header, .comments, .blog-title, .blog-description, .post-title { 
@@ -15,6 +19,8 @@ body, html {
     width: 100% !important;
     overflow: hidden !important;
     background: #e5e3df !important;
+    /* Mobile එකේ Safe area වලට හරියන්න */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .content-outer, .content-inner, .main-outer, .main-inner, .post-outer, .post-body, .widget-content, .entry-content {
     margin: 0 !important;
@@ -36,21 +42,22 @@ body, html {
     background: #e5e3df !important;
 }
 
+/* Mobile එකට හොඳ Touch Friendly Controls */
 .controls {
     position: absolute;
     top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 10px;
+    right: 10px;
     background: #fff;
-    padding: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     z-index: 1000;
-    width: 90%;
     max-width: 450px;
-    border-radius: 12px;
+    margin: 0 auto;
+    border-radius: 16px;
     box-sizing: border-box;
 }
 @media (min-width: 768px) {
@@ -59,26 +66,30 @@ body, html {
 
 .row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
 input, button {
-    padding: 10px 15px; font-size: 14px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer;
+    padding: 12px 15px; font-size: 15px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer;
     box-sizing: border-box;
+    min-height: 44px; /* Mobile Touch Target Size */
+    -webkit-tap-highlight-color: transparent;
 }
-button { background: #1A73E8; color: white; border: none; }
+input { flex: 1; min-width: 100px; }
+button { background: #1A73E8; color: white; border: none; font-weight: 500; }
 button.clear { background: #555; }
 button.backup { background: #28a745; }
 button.restore { background: #ffc107; color: black; }
 
 #status {
     position: absolute; top: 140px; left: 50%; transform: translateX(-50%);
-    padding: 8px 15px; background: rgba(0, 0, 0, 0.85); color: #fff; 
+    padding: 10px 15px; background: rgba(0, 0, 0, 0.85); color: #fff; 
     font-weight: bold; font-size: 13px; border-radius: 20px; z-index: 1000; white-space: nowrap;
     box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;
     max-width: 90%; text-overflow: ellipsis; overflow: hidden;
 }
 
 #recenter-btn {
-    position: absolute; bottom: 20px; right: 20px; width: 50px; height: 50px;
+    position: absolute; bottom: 25px; right: 20px; width: 56px; height: 56px; /* ටිකක් ලොකුවට */
     background: #fff; border: none; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-    font-size: 24px; cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center;
+    font-size: 26px; cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .marker-wrapper {
@@ -107,17 +118,17 @@ button.restore { background: #ffc107; color: black; }
 
 <div class="controls">
     <div class="row">
-        <p style="margin:0; font-size:13px; font-weight:bold; color: #d35400;">පොයින්ට් අතර ගූගල් මැප්ස් වගේ හරියටම පාර අඳියි. (Hold 3s to Delete)</p>
+        <p style="margin:0; font-size:14px; font-weight:bold; color: #d35400; width:100%; text-align:center;">පොයින්ට් අතර ගූගල් මැප්ස් වගේ හරියටම පාර අඳියි.<br><span style="font-size:11px; color:#555;">(ස්ථානයක් මැකීමට එය මත තත්පර 3ක් තද කර තබන්න)</span></p>
     </div>
     <div class="row">
-        <input type="text" id="placeName" placeholder="ස්ථානයේ නම" style="flex: 1; max-width: 200px; min-width: 120px;">
-        <input type="number" id="hideTime" placeholder="Hidden වේලාව" style="width: 100px;" value="3" min="1" max="30">
-        <button onclick="addPlace()">📍 ස්ථානය එක් කරන්න</button>
+        <input type="text" id="placeName" placeholder="ස්ථානයේ නම">
+        <input type="number" id="hideTime" placeholder="Hidden වේලාව" style="width: 110px;" value="3" min="1" max="30">
+        <button onclick="addPlace()">📍 එක් කරන්න</button>
         <button onclick="clearPlaces()" class="clear">🗑️ සියල්ල මකන්න</button>
     </div>
     <div class="row">
-        <button onclick="exportData()" class="backup">📤 Backup (File එක ගන්න)</button>
-        <button onclick="document.getElementById('importFile').click()" class="restore">📥 Restore (File එක දාන්න)</button>
+        <button onclick="exportData()" class="backup">📤 Backup (File ගන්න)</button>
+        <button onclick="document.getElementById('importFile').click()" class="restore">📥 Restore (File දාන්න)</button>
     </div>
 </div>
 
@@ -207,7 +218,7 @@ function initMapApp() {
             placeMarkers.push(marker);
             var markerIndex = index; 
 
-            // Touch Hold 3 seconds to delete marker (Mobile Support)
+            // Mobile Touch සඳහා හරියටම Long Press හඳුනාගැනීම
             marker.on('mousedown touchstart', function(e) {
                 L.DomEvent.stopPropagation(e);
                 L.DomEvent.preventDefault(e);
@@ -218,6 +229,7 @@ function initMapApp() {
                 }, 3000);
             });
             
+            // අත සෙලවූ විට (Map Drag කළ විට) Timer එක නතර කිරීම
             marker.on('mouseup mouseout touchend touchcancel touchmove dragstart', function(e) {
                 if (pressTimer) {
                     clearTimeout(pressTimer);
@@ -293,7 +305,7 @@ function initMapApp() {
                 var importedPlaces = JSON.parse(e.target.result);
                 myPlaces = myPlaces.concat(importedPlaces); 
                 savePlaces();
-                renderPlaces(); // මෙය දැන් සියලුම මාර්කර් නම් පමණක් පෙන්වයි
+                renderPlaces(); 
                 alert("✅ අලුත් ස්ථාන සාර්ථකව එකතු විය!");
             } catch(err) {
                 alert("❌ වැරදි File එකක්. කරුණාකර ඔබ Backup ගත්තු File එකම තෝරන්න.");
