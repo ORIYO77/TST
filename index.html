@@ -64,7 +64,7 @@ body, html {
 input, button {
     padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;
     box-sizing: border-box;
-    min-height: 36px; /* Mobile Touch Target Size */
+    min-height: 36px; 
     -webkit-tap-highlight-color: transparent;
 }
 input { flex: 1; min-width: 80px; }
@@ -73,10 +73,11 @@ button.clear { background: #555; }
 button.backup { background: #28a745; }
 button.restore { background: #ffc107; color: black; }
 
+/* බොත්තම් වැසෙන්නේ නැතිව පහළින් පෙනෙන ලෙස සකස් කර ඇත */
 #status {
-    position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
     padding: 8px 15px; background: rgba(0, 0, 0, 0.85); color: #fff; 
-    font-weight: bold; font-size: 13px; border-radius: 20px; z-index: 1000; white-space: nowrap;
+    font-weight: bold; font-size: 13px; border-radius: 20px; z-index: 999; white-space: nowrap;
     box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;
     max-width: 90%; text-overflow: ellipsis; overflow: hidden;
 }
@@ -112,7 +113,6 @@ button.restore { background: #ffc107; color: black; }
 
 <div id="map"></div>
 
-<!-- පාලන බොත්තම් (කුඩා කර ඇත) -->
 <div class="controls">
     <div class="row">
         <input type="text" id="placeName" placeholder="ස්ථානයේ නම">
@@ -209,7 +209,6 @@ function initMapApp() {
             placeMarkers.push(marker);
             var markerIndex = index; 
 
-            // Mobile Touch සඳහා හරියටම Long Press හඳුනාගැනීම (Native Events භාවිතා කරයි)
             function attachLongPress() {
                 var el = marker.getElement();
                 if (!el) {
@@ -218,13 +217,13 @@ function initMapApp() {
                 }
 
                 var startPress = function(e) {
-                    if (e.button === 2) return; // Ignore right click
+                    if (e.button === 2) return; 
                     isLongPress = false;
                     pressTimer = setTimeout(function() {
                         isLongPress = true;
-                        if (navigator.vibrate) navigator.vibrate(100); // දුරකථනය කම්පනය (Vibrate)
+                        if (navigator.vibrate) navigator.vibrate(100); 
                         deletePlace(markerIndex);
-                    }, 3000); // තත්පර 3ක්
+                    }, 3000); 
                 };
                 
                 var cancelPress = function() {
@@ -234,13 +233,11 @@ function initMapApp() {
                     }
                 };
                 
-                // ජංගම දුරකථන සඳහා Touch Events
                 el.addEventListener('touchstart', startPress, { passive: true, capture: true });
                 el.addEventListener('touchend', cancelPress, { capture: true });
                 el.addEventListener('touchcancel', cancelPress, { capture: true });
-                el.addEventListener('touchmove', cancelPress, { capture: true }); // අත සෙලවූ විට අවලංගු වේ
+                el.addEventListener('touchmove', cancelPress, { capture: true }); 
                 
-                // Desktop සඳහා Mouse Events
                 el.addEventListener('mousedown', startPress, { capture: true });
                 el.addEventListener('mouseup', cancelPress, { capture: true });
                 el.addEventListener('mouseleave', cancelPress, { capture: true });
@@ -348,6 +345,7 @@ function initMapApp() {
         return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
     }
 
+    // Live GPS Movement එක සහ මැප් එක සමඟ යාම සුමට කිරීම
     function animateMovement() {
         var elapsed = Date.now() - startTime;
         var progress = Math.min(elapsed / duration, 1);
@@ -356,10 +354,14 @@ function initMapApp() {
             var currentLat = startLatLng.lat + (targetLatLng.lat - startLatLng.lat) * easeProgress;
             var currentLng = startLatLng.lng + (targetLatLng.lng - startLatLng.lng) * easeProgress;
             if (liveMarker) liveMarker.setLatLng([currentLat, currentLng]);
-            if (!userInteracting) map.panTo([currentLat, currentLng], { animate: false });
+            if (accuracyCircle) accuracyCircle.setLatLng([currentLat, currentLng]);
+            if (!userInteracting) {
+                map.setView([currentLat, currentLng], map.getZoom(), { animate: false });
+            }
         }
         if (progress < 1) { animationFrameId = requestAnimationFrame(animateMovement); } else { animationFrameId = null; }
     }
+    
     function animateRotation() {
         var hElapsed = Date.now() - headingStartTime;
         var hProgress = Math.min(hElapsed / headingDuration, 1);
@@ -570,32 +572,48 @@ function initMapApp() {
                 var lat = pos.coords.latitude, lon = pos.coords.longitude, acc = pos.coords.accuracy;
                 var heading = pos.coords.heading, speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
                 var newLocation = L.latLng(lat, lon); latestExactLocation = newLocation; 
+                
                 if(!isAutoNavigating) {
-                    if (heading !== null && !isNaN(heading) && speed > 1) triggerArrowRotation(heading);
-                    else if (lastLatLng && speed > 1 && lastLatLng.distanceTo(newLocation) > 3) triggerArrowRotation(getBearing(lastLatLng.lat, lastLatLng.lng, lat, lon));
+                    // ඇවිදින විට දිශාව නිවැරදිව හඳුනාගැනීමට වේගය 0.5 ක් දක්වා අඩු කර ඇත
+                    if (heading !== null && !isNaN(heading) && speed > 0.5) triggerArrowRotation(heading);
+                    else if (lastLatLng && speed > 0.5 && lastLatLng.distanceTo(newLocation) > 1) triggerArrowRotation(getBearing(lastLatLng.lat, lastLatLng.lng, lat, lon));
                 }
+
                 if (!liveMarker) {
                     liveMarker = L.marker(newLocation, { icon: createArrowIcon(currentHeading) }).addTo(map);
                     liveMarker.speed = speed;
                     accuracyCircle = L.circle(newLocation, { radius: acc, color: '#1A73E8', fillColor: '#1A73E8', fillOpacity: 0.15, weight: 1 }).addTo(map);
-                    map.setView(newLocation, 16);
+                    map.setView(newLocation, 18);
                 } else {
                     if(!isAutoNavigating) {
-                        liveMarker.speed = speed; startLatLng = liveMarker.getLatLng(); targetLatLng = newLocation; startTime = Date.now();
+                        liveMarker.speed = speed; 
+                        startLatLng = liveMarker.getLatLng(); targetLatLng = newLocation; startTime = Date.now();
+                        duration = 1000; // තත්පර 1ක සුමට චලිතයක්
                         if (!animationFrameId) animationFrameId = requestAnimationFrame(animateMovement);
                     }
-                    accuracyCircle.setLatLng(newLocation); accuracyCircle.setRadius(acc);
+                    if (accuracyCircle) {
+                        accuracyCircle.setLatLng(newLocation); accuracyCircle.setRadius(acc);
+                    }
                 }
                 lastLatLng = newLocation;
-                if(!isAutoNavigating) document.getElementById('status').innerText = "🟢 " + Math.round(speed) + " km/h | (±" + Math.round(acc) + "මී)";
-            }, err => { document.getElementById('status').innerText = "❌ GPS Permission දීලා නැද්ද බලන්න!"; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                if(!isAutoNavigating) {
+                    document.getElementById('status').style.display = 'block';
+                    document.getElementById('status').innerText = "🟢 " + Math.round(speed) + " km/h | (±" + Math.round(acc) + "මී)";
+                }
+            }, err => { 
+                document.getElementById('status').innerText = "❌ GPS Permission දීලා නැද්ද බලන්න!"; 
+            }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
         }
     }
 
     window.recenterMap = function() { 
         userInteracting = false; 
-        if (latestExactLocation) { if (liveMarker) liveMarker.setLatLng(latestExactLocation); map.setView(latestExactLocation, 18, { animate: true }); } 
-        else if (liveMarker) map.setView(liveMarker.getLatLng(), 18, { animate: true }); 
+        if (latestExactLocation) { 
+            if (liveMarker) liveMarker.setLatLng(latestExactLocation); 
+            map.setView(latestExactLocation, 18, { animate: true }); 
+        } else if (liveMarker) {
+            map.setView(liveMarker.getLatLng(), 18, { animate: true }); 
+        }
     };
 
     window.addPlace = addPlace;
@@ -620,7 +638,7 @@ function initMapApp() {
         if (typeof event.webkitCompassHeading !== 'undefined') compassHeading = event.webkitCompassHeading;
         else if (typeof event.absolute !== 'undefined' && event.absolute && event.alpha !== null) compassHeading = 360 - event.alpha;
         else if (event.alpha !== null) compassHeading = 360 - event.alpha;
-        if (compassHeading !== null && !isNaN(compassHeading) && (!liveMarker || !liveMarker.speed || liveMarker.speed < 2)) triggerArrowRotation(compassHeading);
+        if (compassHeading !== null && !isNaN(compassHeading) && (!liveMarker || !liveMarker.speed || liveMarker.speed < 1)) triggerArrowRotation(compassHeading);
     }
 }
 
