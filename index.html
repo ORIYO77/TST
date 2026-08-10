@@ -41,52 +41,50 @@ body, html {
     background: #e5e3df !important;
 }
 
+/* Mobile එකට හොඳ Compact Touch Friendly Controls */
 .controls {
     position: absolute;
-    top: 10px;
-    left: 10px;
-    right: 10px;
+    top: 5px;
+    left: 5px;
+    right: 5px;
     background: #fff;
-    padding: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    padding: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 5px;
     z-index: 1000;
-    max-width: 450px;
+    max-width: 400px;
     margin: 0 auto;
-    border-radius: 16px;
+    border-radius: 10px;
     box-sizing: border-box;
-}
-@media (min-width: 768px) {
-    .controls { width: auto; }
 }
 
-.row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row { display: flex; justify-content: center; align-items: center; gap: 5px; flex-wrap: wrap; }
 input, button {
-    padding: 12px 15px; font-size: 15px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer;
+    padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;
     box-sizing: border-box;
-    min-height: 44px; 
+    min-height: 36px; /* Mobile Touch Target Size */
     -webkit-tap-highlight-color: transparent;
 }
-input { flex: 1; min-width: 100px; }
+input { flex: 1; min-width: 80px; }
 button { background: #1A73E8; color: white; border: none; font-weight: 500; }
 button.clear { background: #555; }
 button.backup { background: #28a745; }
 button.restore { background: #ffc107; color: black; }
 
 #status {
-    position: absolute; top: 140px; left: 50%; transform: translateX(-50%);
-    padding: 10px 15px; background: rgba(0, 0, 0, 0.85); color: #fff; 
+    position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
+    padding: 8px 15px; background: rgba(0, 0, 0, 0.85); color: #fff; 
     font-weight: bold; font-size: 13px; border-radius: 20px; z-index: 1000; white-space: nowrap;
     box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;
     max-width: 90%; text-overflow: ellipsis; overflow: hidden;
 }
 
 #recenter-btn {
-    position: absolute; bottom: 25px; right: 20px; width: 56px; height: 56px; 
+    position: absolute; bottom: 20px; right: 15px; width: 50px; height: 50px; 
     background: #fff; border: none; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-    font-size: 26px; cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center;
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -114,19 +112,17 @@ button.restore { background: #ffc107; color: black; }
 
 <div id="map"></div>
 
+<!-- පාලන බොත්තම් (කුඩා කර ඇත) -->
 <div class="controls">
     <div class="row">
-        <p style="margin:0; font-size:14px; font-weight:bold; color: #d35400; width:100%; text-align:center;">පොයින්ට් අතර ගූගල් මැප්ස් වගේ හරියටම පාර අඳියි.<br><span style="font-size:11px; color:#555;">(ස්ථානයක් මැකීමට එය මත තත්පර 3ක් තද කර තබන්න)</span></p>
-    </div>
-    <div class="row">
         <input type="text" id="placeName" placeholder="ස්ථානයේ නම">
-        <input type="number" id="hideTime" placeholder="Hidden වේලාව" style="width: 110px;" value="3" min="1" max="30">
+        <input type="number" id="hideTime" placeholder="Sec" style="width: 60px;" value="3" min="1" max="30">
         <button onclick="addPlace()">📍 එක් කරන්න</button>
-        <button onclick="clearPlaces()" class="clear">🗑️ සියල්ල මකන්න</button>
+        <button onclick="clearPlaces()" class="clear">🗑️ මකන්න</button>
     </div>
     <div class="row">
-        <button onclick="exportData()" class="backup">📤 Backup (File ගන්න)</button>
-        <button onclick="document.getElementById('importFile').click()" class="restore">📥 Restore (File දාන්න)</button>
+        <button onclick="exportData()" class="backup">📤 Backup</button>
+        <button onclick="document.getElementById('importFile').click()" class="restore">📥 Restore</button>
     </div>
 </div>
 
@@ -228,7 +224,7 @@ function initMapApp() {
                         isLongPress = true;
                         if (navigator.vibrate) navigator.vibrate(100); // දුරකථනය කම්පනය (Vibrate)
                         deletePlace(markerIndex);
-                    }, 3000);
+                    }, 3000); // තත්පර 3ක්
                 };
                 
                 var cancelPress = function() {
@@ -242,7 +238,7 @@ function initMapApp() {
                 el.addEventListener('touchstart', startPress, { passive: true, capture: true });
                 el.addEventListener('touchend', cancelPress, { capture: true });
                 el.addEventListener('touchcancel', cancelPress, { capture: true });
-                el.addEventListener('touchmove', cancelPress, { capture: true });
+                el.addEventListener('touchmove', cancelPress, { capture: true }); // අත සෙලවූ විට අවලංගු වේ
                 
                 // Desktop සඳහා Mouse Events
                 el.addEventListener('mousedown', startPress, { capture: true });
