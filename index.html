@@ -174,10 +174,10 @@ function initMapApp() {
                 oscillator.type = 'sine'; 
                 oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
                 gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4); // තත්පර 0.4ක් නාද වේ
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4); 
                 oscillator.start(audioCtx.currentTime);
                 oscillator.stop(audioCtx.currentTime + 0.4);
-            }, i * 600); // තත්පර 0.6ක විරාමයකින් නාද වේ (Slow)
+            }, i * 600); 
         }
     }
 
@@ -200,50 +200,48 @@ function initMapApp() {
         myPlaces.forEach(function(place, index) {
             var marker = L.marker(place.latlng, { icon: L.divIcon({ html: `<div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }) }).addTo(map);
             
-            if (place.hasImage) {
-                marker.setIcon(createImageIcon(place.imageSrc));
-            } else {
-                marker.setIcon(createNameIcon(place.name));
-            }
+            // ඡායාරූපයක් තිබුණත් නැතත් මුලින්ම නම (Label) පමණක් පෙන්වයි. Image එක සැඟවේ.
+            place.isVisible = false;
+            marker.setIcon(createNameIcon(place.name));
 
             placeMarkers.push(marker);
             var markerIndex = index; 
 
-            // Touch Hold 3 seconds to delete marker
-            function startPressTimer() {
+            // Touch Hold 3 seconds to delete marker (Mobile Support)
+            marker.on('mousedown touchstart', function(e) {
+                L.DomEvent.stopPropagation(e);
+                L.DomEvent.preventDefault(e);
                 isLongPress = false;
                 pressTimer = setTimeout(function() {
                     isLongPress = true;
                     deletePlace(markerIndex);
                 }, 3000);
-            }
-            function clearPressTimer() {
+            });
+            
+            marker.on('mouseup mouseout touchend touchcancel touchmove dragstart', function(e) {
                 if (pressTimer) {
                     clearTimeout(pressTimer);
                     pressTimer = null;
                 }
-            }
-
-            marker.on('mousedown touchstart', function(e) {
-                if(e.originalEvent.target.classList.contains('custom-pin')) {
-                    startPressTimer();
-                }
             });
-            marker.on('mouseup mouseout touchend touchcancel', clearPressTimer);
 
             marker.on('click', function(e) {
-                if(e.originalEvent.target.classList.contains('custom-pin')) {
-                    L.DomEvent.stopPropagation(e);
-                    if (isLongPress) { isLongPress = false; return; } // If it was a long press, ignore the click
-                    if (preventSingleClick) { preventSingleClick = false; return; }
-                    clickTimeout = setTimeout(function() { handleSingleClick(markerIndex); }, 300);
+                L.DomEvent.stopPropagation(e);
+                if (isLongPress) { 
+                    isLongPress = false; 
+                    return; 
                 }
+                if (preventSingleClick) { preventSingleClick = false; return; }
+                clickTimeout = setTimeout(function() { handleSingleClick(markerIndex); }, 300);
             });
+            
             marker.on('dblclick', function(e) {
-                if(e.originalEvent.target.classList.contains('custom-pin')) {
-                    L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
-                    clearTimeout(clickTimeout); preventSingleClick = true; handleDoubleClick(markerIndex);
-                }
+                L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
+                clearTimeout(clickTimeout); preventSingleClick = true; handleDoubleClick(markerIndex);
+            });
+            
+            marker.on('contextmenu', function(e) {
+                L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
             });
 
             if (index > 0) {
@@ -256,9 +254,9 @@ function initMapApp() {
     // Marker එකක් මකාදැමීම සඳහා වන ක්‍රියාවලිය
     function deletePlace(index) {
         if (confirm("මෙම ස්ථානය '" + myPlaces[index].name + "' මකාදැමීමට අවශ්‍යද?")) {
-            myPlaces.splice(index, 1); // දත්ත අඩංගු ලැයිස්තුවෙන් ඉවත් කිරීම
+            myPlaces.splice(index, 1); 
             savePlaces();
-            renderPlaces(); // මැප් එක යළි ගොඩනැගීම
+            renderPlaces(); 
             document.getElementById('status').innerText = "🗑️ ස්ථානය මකාදමා ඇත.";
             document.getElementById('status').style.display = 'block';
             setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
@@ -285,7 +283,7 @@ function initMapApp() {
         linkElement.click();
     };
 
-    // Restore කිරීමේදී අලුත් දත්ත එකතු කිරීම සහ ඡායාරූප තත්පර 6ක් පෙන්වීම
+    // Restore කිරීමේදී අලුත් දත්ත එකතු කිරීම (ඡායාරූප එකවර පෙන්වන්නේ නැත)
     document.getElementById('importFile').addEventListener('change', function(event) {
         var file = event.target.files[0];
         if (!file) return;
@@ -295,24 +293,8 @@ function initMapApp() {
                 var importedPlaces = JSON.parse(e.target.result);
                 myPlaces = myPlaces.concat(importedPlaces); 
                 savePlaces();
-                renderPlaces();
-                
-                // Restore කළ සැණෙහි සියලුම ඡායාරූප තත්පර 6ක් පෙන්වීම
-                for (var i = 0; i < myPlaces.length; i++) {
-                    if (myPlaces[i].hasImage && placeMarkers[i]) {
-                        myPlaces[i].isVisible = true;
-                        placeMarkers[i].setIcon(createImageIcon(myPlaces[i].imageSrc));
-                        
-                        setTimeout(function(idx) {
-                            if (myPlaces[idx] && placeMarkers[idx]) {
-                                myPlaces[idx].isVisible = false;
-                                placeMarkers[idx].setIcon(createNameIcon(myPlaces[idx].name));
-                            }
-                        }, 6000, i);
-                    }
-                }
-                
-                alert("✅ අලුත් ස්ථාන සාර්ථකව එකතු විය! ඡායාරූප තත්පර 6ක් පෙන්වන ලදී.");
+                renderPlaces(); // මෙය දැන් සියලුම මාර්කර් නම් පමණක් පෙන්වයි
+                alert("✅ අලුත් ස්ථාන සාර්ථකව එකතු විය!");
             } catch(err) {
                 alert("❌ වැරදි File එකක්. කරුණාකර ඔබ Backup ගත්තු File එකම තෝරන්න.");
             }
@@ -401,6 +383,7 @@ function initMapApp() {
     function createImageIcon(src) { return L.divIcon({ html: `<img src="${src}" class="custom-marker-img"><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }); }
     function createNameIcon(name) { return L.divIcon({ html: `<div class="marker-name-label">${name}</div><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }); }
 
+    // Click කළ විට පමණක් ඡායාරූපය පෙන්වා පසුව සැඟවීම
     function handleSingleClick(index) {
         var placeData = myPlaces[index];
         if (!placeData.hasImage) { document.getElementById('imageInput').dataset.markerIndex = index; document.getElementById('imageInput').click(); return; }
