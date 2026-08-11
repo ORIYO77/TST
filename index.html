@@ -53,27 +53,28 @@ body, html {
     flex-direction: column;
     gap: 5px;
     z-index: 1000;
-    max-width: 400px;
+    max-width: 450px;
     margin: 0 auto;
     border-radius: 10px;
     box-sizing: border-box;
 }
 
 .row { display: flex; justify-content: center; align-items: center; gap: 5px; flex-wrap: wrap; }
-input, button {
+input, button, select {
     padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;
     box-sizing: border-box;
     min-height: 36px; 
     -webkit-tap-highlight-color: transparent;
 }
-input { flex: 1; min-width: 80px; }
+input, select { flex: 1; min-width: 80px; }
 button { background: #1A73E8; color: white; border: none; font-weight: 500; }
 button.clear { background: #555; }
 button.backup { background: #28a745; }
 button.restore { background: #ffc107; color: black; }
+button.addCat { background: #6c757d; }
 
 #status {
-    position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: 150px; left: 50%; transform: translateX(-50%);
     padding: 8px 15px; background: rgba(0, 0, 0, 0.85); color: #fff; 
     font-weight: bold; font-size: 13px; border-radius: 20px; z-index: 999; white-space: nowrap;
     box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none;
@@ -108,7 +109,6 @@ button.restore { background: #ffc107; color: black; }
     box-shadow: 0 2px 6px rgba(0,0,0,0.4); white-space: nowrap; border: 2px solid #1A73E8;
 }
 
-/* Copy & Restore Modal එකේ සැකසුම් */
 .modal {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
     background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center;
@@ -127,11 +127,16 @@ button.restore { background: #ffc107; color: black; }
 <div id="map"></div>
 
 <div class="controls">
+    <!-- කාණ්ඩ (Categories) කළමාන කොටුව -->
+    <div class="row">
+        <select id="categorySelect" onchange="changeCategory()"></select>
+        <button onclick="addNewCategory()" class="addCat">➕ කාණ්ඩය</button>
+        <button onclick="deleteCategory()" class="clear">🗑️</button>
+    </div>
     <div class="row">
         <input type="text" id="placeName" placeholder="ස්ථානයේ නම">
-        <input type="number" id="hideTime" placeholder="Sec" style="width: 60px;" value="3" min="1" max="30">
+        <input type="number" id="hideTime" placeholder="Sec" style="width: 50px;" value="3" min="1" max="30">
         <button onclick="addPlace()">📍 එක් කරන්න</button>
-        <button onclick="clearPlaces()" class="clear">🗑️ මකන්න</button>
     </div>
     <div class="row">
         <button onclick="exportData()" class="backup">📤 Backup</button>
@@ -145,7 +150,6 @@ button.restore { background: #ffc107; color: black; }
 <input type="file" id="imageInput" accept="image/*" style="display: none;">
 <input type="file" id="imageChangeInput" accept="image/*" style="display: none;">
 
-<!-- Backup ගැනීමේ කොටුව -->
 <div id="copyModal" class="modal">
     <div class="modal-box">
         <p style="font-size:14px; margin:0 0 10px 0; font-weight:bold; text-align:center;">
@@ -157,7 +161,6 @@ button.restore { background: #ffc107; color: black; }
     </div>
 </div>
 
-<!-- Restore කිරීමේ කොටුව -->
 <div id="restoreModal" class="modal">
     <div class="modal-box">
         <p style="font-size:14px; margin:0 0 10px 0; font-weight:bold; text-align:center;">
@@ -182,7 +185,8 @@ function initMapApp() {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
     var liveMarker = null, accuracyCircle = null, userInteracting = false, lastLatLng = null, watchId = null;
-    var myPlaces = [], placeMarkers = [], routeLines = [];
+    var allPlaces = [], categories = [], activeCategory = "";
+    var placeMarkers = [], routeLines = [];
     
     var isAutoNavigating = false;
     var navPath = [], navIndex = 0, navStartTime = 0, navTotalDuration = 0;
@@ -190,12 +194,11 @@ function initMapApp() {
 
     var animationFrameId = null, startLatLng = null, targetLatLng = null, startTime = 0, duration = 1000;
     var currentHeading = 0, targetHeading = 0, startHeading = 0, headingStartTime = 0, headingDuration = 300, isRotating = false;
-    var tempLatLng = null, activeMarkerIndex = null, clickTimeout = null, preventSingleClick = false, hideTimers = {};
+    var tempLatLng = null, activeMarkerId = null, clickTimeout = null, preventSingleClick = false, hideTimers = {};
 
     var audioCtx = null;
     var hasBeepedForTarget = false; 
     var latestExactLocation = null;
-    
     var pressTimer = null;
     var isLongPress = false;
 
@@ -203,7 +206,6 @@ function initMapApp() {
         if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
-    
     function playBeepMultiple(times) {
         if (!audioCtx) return;
         for (var i = 0; i < times; i++) {
@@ -212,12 +214,10 @@ function initMapApp() {
                 var gainNode = audioCtx.createGain();
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
-                oscillator.type = 'sine'; 
-                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
+                oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
                 gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4); 
-                oscillator.start(audioCtx.currentTime);
-                oscillator.stop(audioCtx.currentTime + 0.4);
+                oscillator.start(audioCtx.currentTime); oscillator.stop(audioCtx.currentTime + 0.4);
             }, i * 600); 
         }
     }
@@ -225,34 +225,102 @@ function initMapApp() {
     document.body.addEventListener('click', initAudio, { once: true });
     document.body.addEventListener('touchend', initAudio, { once: true });
 
+    // ----------------------------------------------------
+    // Category & Local Storage Logic
+    // ----------------------------------------------------
     function savePlaces() {
         try {
-            localStorage.setItem('myMapPlaces', JSON.stringify(myPlaces));
+            localStorage.setItem('myMapPlaces', JSON.stringify({ places: allPlaces, categories: categories }));
         } catch(e) {
             console.error("Storage limit exceeded", e);
             alert("දුරකථනයේ මතකය පිරී ඇත. ඡායාරූප ගොනු කර Backup ගන්න.");
         }
     }
 
+    function loadPlaces() {
+        var saved = localStorage.getItem('myMapPlaces');
+        if (saved) {
+            var data = JSON.parse(saved);
+            allPlaces = data.places || [];
+            categories = data.categories || [];
+            activeCategory = categories[0] || "";
+            updateCategoryDropdown();
+            renderPlaces();
+        } else {
+            activeCategory = "සාමාන්‍ය";
+            categories.push(activeCategory);
+            updateCategoryDropdown();
+        }
+    }
+
+    window.addNewCategory = function() {
+        var catName = prompt("අලුත් කාණ්ඩයේ නම (Category Name):");
+        if (catName && catName.trim()) {
+            catName = catName.trim();
+            if (!categories.includes(catName)) {
+                categories.push(catName);
+                activeCategory = catName;
+                updateCategoryDropdown();
+                renderPlaces();
+                savePlaces();
+            } else {
+                alert("මෙම කාණ්ඩය දැනටමත් තිබේ.");
+                activeCategory = catName;
+                updateCategoryDropdown();
+                renderPlaces();
+            }
+        }
+    };
+
+    window.changeCategory = function() {
+        var select = document.getElementById('categorySelect');
+        activeCategory = select.value;
+        renderPlaces();
+    };
+
+    window.deleteCategory = function() {
+        if (!activeCategory) return;
+        if (confirm("මෙම කාණ්ඩය '" + activeCategory + "' සහ ඒ යටතේ ඇති සියලුම ස්ථාන මැකීමට අවශ්‍යද?")) {
+            allPlaces = allPlaces.filter(p => p.category !== activeCategory);
+            categories = categories.filter(c => c !== activeCategory);
+            activeCategory = categories[0] || "";
+            updateCategoryDropdown();
+            renderPlaces();
+            savePlaces();
+        }
+    };
+
+    function updateCategoryDropdown() {
+        var select = document.getElementById('categorySelect');
+        select.innerHTML = '';
+        categories.forEach(function(cat) {
+            var option = document.createElement('option');
+            option.value = cat;
+            option.text = cat;
+            if (cat === activeCategory) option.selected = true;
+            select.appendChild(option);
+        });
+    }
+
     function renderPlaces() {
-        placeMarkers.forEach(m => map.removeLayer(m)); placeMarkers = [];
+        placeMarkers.forEach(m => map.removeLayer(m.marker)); placeMarkers = [];
         routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
+        activeMarkerId = null; 
         
-        myPlaces.forEach(function(place, index) {
+        var activePlaces = allPlaces.filter(p => p.category === activeCategory);
+        
+        activePlaces.forEach(function(place, index) {
             var marker = L.marker(place.latlng, { icon: L.divIcon({ html: `<div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }) }).addTo(map);
             
             place.isVisible = false;
             marker.setIcon(createNameIcon(place.name));
 
-            placeMarkers.push(marker);
-            var markerIndex = index; 
+            placeMarkers.push({ id: place.id, marker: marker });
+            var markerId = place.id; 
 
             function attachLongPress() {
                 var el = marker.getElement();
-                if (!el) {
-                    setTimeout(attachLongPress, 50);
-                    return;
-                }
+                if (!el) { setTimeout(attachLongPress, 50); return; }
 
                 var startPress = function(e) {
                     if (e.button === 2) return; 
@@ -260,58 +328,47 @@ function initMapApp() {
                     pressTimer = setTimeout(function() {
                         isLongPress = true;
                         if (navigator.vibrate) navigator.vibrate(100); 
-                        deletePlace(markerIndex);
+                        deletePlace(markerId);
                     }, 3000); 
                 };
-                
                 var cancelPress = function() {
-                    if (pressTimer) {
-                        clearTimeout(pressTimer);
-                        pressTimer = null;
-                    }
+                    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
                 };
                 
                 el.addEventListener('touchstart', startPress, { passive: true, capture: true });
                 el.addEventListener('touchend', cancelPress, { capture: true });
                 el.addEventListener('touchcancel', cancelPress, { capture: true });
                 el.addEventListener('touchmove', cancelPress, { capture: true }); 
-                
                 el.addEventListener('mousedown', startPress, { capture: true });
                 el.addEventListener('mouseup', cancelPress, { capture: true });
                 el.addEventListener('mouseleave', cancelPress, { capture: true });
             }
-            
             attachLongPress();
 
             marker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
-                if (isLongPress) { 
-                    isLongPress = false; 
-                    return; 
-                }
+                if (isLongPress) { isLongPress = false; return; }
                 if (preventSingleClick) { preventSingleClick = false; return; }
-                clickTimeout = setTimeout(function() { handleSingleClick(markerIndex); }, 300);
+                clickTimeout = setTimeout(function() { handleSingleClick(markerId); }, 300);
             });
-            
             marker.on('dblclick', function(e) {
                 L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
-                clearTimeout(clickTimeout); preventSingleClick = true; handleDoubleClick(markerIndex);
+                clearTimeout(clickTimeout); preventSingleClick = true; handleDoubleClick(markerId);
             });
-            
-            marker.on('contextmenu', function(e) {
-                L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
-            });
+            marker.on('contextmenu', function(e) { L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e); });
 
             if (index > 0) {
-                drawPerfectRoute(myPlaces[index - 1].latlng, place.latlng, false);
+                drawPerfectRoute(activePlaces[index - 1].latlng, place.latlng, false);
             }
         });
         setTimeout(updateMarkerScales, 50);
     }
 
-    function deletePlace(index) {
-        if (confirm("මෙම ස්ථානය '" + myPlaces[index].name + "' මකාදැමීමට අවශ්‍යද?")) {
-            myPlaces.splice(index, 1); 
+    function deletePlace(id) {
+        var placeData = allPlaces.find(p => p.id === id);
+        if (!placeData) return;
+        if (confirm("මෙම ස්ථානය '" + placeData.name + "' මකාදැමීමට අවශ්‍යද?")) {
+            allPlaces = allPlaces.filter(p => p.id !== id);
             savePlaces();
             renderPlaces(); 
             document.getElementById('status').innerText = "🗑️ ස්ථානය මකාදමා ඇත.";
@@ -320,18 +377,9 @@ function initMapApp() {
         }
     }
 
-    function loadPlaces() {
-        var saved = localStorage.getItem('myMapPlaces');
-        if (saved) {
-            myPlaces = JSON.parse(saved);
-            renderPlaces();
-        }
-    }
-
-    // Backup ගැනීම (Copy කරගැනීමට කොටුව පෙන්වයි)
     window.exportData = function() {
-        if (myPlaces.length === 0) { alert("කරුණාකර මුලින්ම ස්ථානයක් එක් කරන්න."); return; }
-        var dataStr = JSON.stringify(myPlaces);
+        if (allPlaces.length === 0) { alert("කරුණාකර මුලින්ම ස්ථානයක් එක් කරන්න."); return; }
+        var dataStr = JSON.stringify({ places: allPlaces, categories: categories });
         showCopyText(dataStr);
     };
 
@@ -340,19 +388,12 @@ function initMapApp() {
         var textArea = document.getElementById('copyTextData');
         textArea.value = text;
         modal.style.display = 'flex';
-        
-        // Mobile එකේ Copy කිරීමට පහසුවීමට
-        textArea.focus();
-        textArea.select();
+        textArea.focus(); textArea.select();
         if (navigator.share) {
-            navigator.share({
-                title: 'Map Backup Data',
-                text: text
-            }).catch(err => {});
+            navigator.share({ title: 'Map Backup Data', text: text }).catch(err => {});
         }
     }
 
-    // Restore කිරීමේ කොටුව දැක්වීම
     window.showRestoreModal = function() {
         var modal = document.getElementById('restoreModal');
         var textArea = document.getElementById('restoreTextData');
@@ -361,20 +402,23 @@ function initMapApp() {
         setTimeout(function() { textArea.focus(); }, 100);
     };
 
-    // Paste කළ දත්ත ගෙන මැප් එකට දාන්න
     window.processRestoreData = function() {
         var text = document.getElementById('restoreTextData').value;
-        if (!text.trim()) {
-            alert("කරුණාකර දත්ත අරගෙන Paste කරන්න.");
-            return;
-        }
+        if (!text.trim()) { alert("කරුණාකර දත්ත අරගෙන Paste කරන්න."); return; }
         try {
-            var importedPlaces = JSON.parse(text);
-            myPlaces = myPlaces.concat(importedPlaces); 
-            savePlaces();
-            renderPlaces(); 
-            document.getElementById('restoreModal').style.display = 'none';
-            alert("✅ අලුත් ස්ථාන සාර්ථකව එකතු විය!");
+            var data = JSON.parse(text);
+            if (data.places && data.categories) {
+                allPlaces = allPlaces.concat(data.places);
+                categories = Array.from(new Set([...categories, ...data.categories])); // අලුත් කාණ්ඩ එකතු කරයි
+                savePlaces();
+                activeCategory = categories[0] || "";
+                updateCategoryDropdown();
+                renderPlaces(); 
+                document.getElementById('restoreModal').style.display = 'none';
+                alert("✅ අලුත් ස්ථාන සහ කාණ්ඩ සාර්ථකව එකතු විය!");
+            } else {
+                alert("❌ වැරදි කේතයක්.");
+            }
         } catch(err) {
             alert("❌ වැරදි කේතයක්. කරුණාකර Backup ගත්තු කේතයම Paste කරන්න.");
         }
@@ -385,8 +429,8 @@ function initMapApp() {
     function updateMarkerScales() {
         var zoom = map.getZoom();
         var scale = Math.max(0.8, Math.min(1.2, (zoom - 8) / 5)); 
-        placeMarkers.forEach(function(marker) {
-            var el = marker.getElement();
+        placeMarkers.forEach(function(mObj) {
+            var el = mObj.marker.getElement();
             if (el) el.style.setProperty('--zoom-scale', scale);
         });
     }
@@ -413,13 +457,10 @@ function initMapApp() {
             var currentLng = startLatLng.lng + (targetLatLng.lng - startLatLng.lng) * easeProgress;
             if (liveMarker) liveMarker.setLatLng([currentLat, currentLng]);
             if (accuracyCircle) accuracyCircle.setLatLng([currentLat, currentLng]);
-            if (!userInteracting) {
-                map.setView([currentLat, currentLng], map.getZoom(), { animate: false });
-            }
+            if (!userInteracting) { map.setView([currentLat, currentLng], map.getZoom(), { animate: false }); }
         }
         if (progress < 1) { animationFrameId = requestAnimationFrame(animateMovement); } else { animationFrameId = null; }
     }
-    
     function animateRotation() {
         var hElapsed = Date.now() - headingStartTime;
         var hProgress = Math.min(hElapsed / headingDuration, 1);
@@ -438,7 +479,7 @@ function initMapApp() {
 
     map.on('click', function(e) {
         tempLatLng = e.latlng;
-        document.getElementById('placeName').value = "ස්ථානය " + (myPlaces.length + 1);
+        document.getElementById('placeName').value = "ස්ථානය " + (allPlaces.filter(p => p.category === activeCategory).length + 1);
         document.getElementById('placeName').focus();
     });
 
@@ -446,46 +487,75 @@ function initMapApp() {
         var name = document.getElementById('placeName').value;
         var timeToHide = parseInt(document.getElementById('hideTime').value) || 3; 
         if (!tempLatLng) { alert("කරුණාකර මුලින්ම මැප් එකේ හිස් තැනක් අත තදන්න."); return; }
-        if (!name) name = "ස්ථානය " + (myPlaces.length + 1);
+        if (!name) name = "ස්ථානය " + (allPlaces.filter(p => p.category === activeCategory).length + 1);
 
-        myPlaces.push({ latlng: tempLatLng, name: name, id: myPlaces.length + 1, hasImage: false, imageSrc: "", hideTime: timeToHide, isVisible: false });
+        var newPlace = {
+            id: Date.now().toString(),
+            category: activeCategory,
+            latlng: tempLatLng, 
+            name: name, 
+            hasImage: false, 
+            imageSrc: "", 
+            hideTime: timeToHide, 
+            isVisible: false
+        };
+        allPlaces.push(newPlace);
         
         renderPlaces(); 
         
         var startPoint, endPoint = tempLatLng;
-        if (myPlaces.length === 1) { startPoint = liveMarker ? liveMarker.getLatLng() : map.getCenter(); } else { startPoint = myPlaces[myPlaces.length - 2].latlng; }
+        var activePlaces = allPlaces.filter(p => p.category === activeCategory);
+        if (activePlaces.length === 1) { startPoint = liveMarker ? liveMarker.getLatLng() : map.getCenter(); } 
+        else { startPoint = activePlaces[activePlaces.length - 2].latlng; }
         
         drawPerfectRoute(startPoint, endPoint, true);
         tempLatLng = null; document.getElementById('placeName').value = "";
-        
         savePlaces(); 
     }
 
     function createImageIcon(src) { return L.divIcon({ html: `<img src="${src}" class="custom-marker-img"><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }); }
     function createNameIcon(name) { return L.divIcon({ html: `<div class="marker-name-label">${name}</div><div class="custom-pin"></div>`, className: 'marker-wrapper', iconSize: [0, 0], iconAnchor: [0, 0] }); }
 
-    function handleSingleClick(index) {
-        var placeData = myPlaces[index];
-        if (!placeData.hasImage) { document.getElementById('imageInput').dataset.markerIndex = index; document.getElementById('imageInput').click(); return; }
-        if (placeData.isVisible) { hideImage(index); } else { showImage(index); }
+    function handleSingleClick(id) {
+        var placeData = allPlaces.find(p => p.id === id);
+        if (!placeData) return;
+        if (!placeData.hasImage) { 
+            document.getElementById('imageInput').dataset.markerId = id; 
+            document.getElementById('imageInput').click(); 
+            return; 
+        }
+        if (placeData.isVisible) { hideImage(id); } else { showImage(id); }
     }
-    function showImage(index) {
-        var marker = placeMarkers[index], placeData = myPlaces[index];
-        if (activeMarkerIndex !== null && activeMarkerIndex !== index && myPlaces[activeMarkerIndex].isVisible) hideImage(activeMarkerIndex);
-        placeData.isVisible = true; activeMarkerIndex = index; marker.setIcon(createImageIcon(placeData.imageSrc));
-        if (hideTimers[index]) clearTimeout(hideTimers[index]);
-        hideTimers[index] = setTimeout(function() { hideImage(index); }, placeData.hideTime * 1000); 
+    function showImage(id) {
+        var placeData = allPlaces.find(p => p.id === id);
+        if (!placeData) return;
+        var mObj = placeMarkers.find(m => m.id === id);
+        if (!mObj) return;
+        
+        if (activeMarkerId && activeMarkerId !== id) hideImage(activeMarkerId);
+        placeData.isVisible = true; activeMarkerId = id; 
+        mObj.marker.setIcon(createImageIcon(placeData.imageSrc));
+        if (hideTimers[id]) clearTimeout(hideTimers[id]);
+        hideTimers[id] = setTimeout(function() { hideImage(id); }, placeData.hideTime * 1000); 
     }
-    function hideImage(index) {
-        var marker = placeMarkers[index], placeData = myPlaces[index];
+    function hideImage(id) {
+        var placeData = allPlaces.find(p => p.id === id);
+        if (!placeData) return;
+        var mObj = placeMarkers.find(m => m.id === id);
+        if (!mObj) return;
+        
         placeData.isVisible = false;
-        if (hideTimers[index]) { clearTimeout(hideTimers[index]); delete hideTimers[index]; }
-        marker.setIcon(createNameIcon(placeData.name)); if (activeMarkerIndex === index) activeMarkerIndex = null;
+        if (hideTimers[id]) { clearTimeout(hideTimers[id]); delete hideTimers[id]; }
+        mObj.marker.setIcon(createNameIcon(placeData.name)); 
+        if (activeMarkerId === id) activeMarkerId = null;
     }
-    function handleDoubleClick(index) {
-        var placeData = myPlaces[index];
+    function handleDoubleClick(id) {
+        var placeData = allPlaces.find(p => p.id === id);
+        if (!placeData) return;
         if (!placeData.hasImage) { alert("ඡායාරූපය වෙනස් කරන්න නම්, මුලින්ම Single Click එකකින් ඡායාරූපයක් දාන්න."); return; }
-        showImage(index); document.getElementById('imageChangeInput').dataset.markerIndex = index; document.getElementById('imageChangeInput').click();
+        showImage(id); 
+        document.getElementById('imageChangeInput').dataset.markerId = id; 
+        document.getElementById('imageChangeInput').click();
     }
 
     function compressImage(file, callback) {
@@ -509,23 +579,29 @@ function initMapApp() {
     }
 
     document.getElementById('imageInput').addEventListener('change', function(event) {
-        var file = event.target.files[0], index = parseInt(this.dataset.markerIndex);
-        if (isNaN(index) || !file) return;
+        var file = event.target.files[0], id = this.dataset.markerId;
+        if (!id || !file) return;
         compressImage(file, function(dataUrl) {
-            myPlaces[index].hasImage = true; 
-            myPlaces[index].imageSrc = dataUrl; 
-            showImage(index); 
-            savePlaces(); 
+            var placeData = allPlaces.find(p => p.id === id);
+            if (placeData) {
+                placeData.hasImage = true; 
+                placeData.imageSrc = dataUrl; 
+                showImage(id); 
+                savePlaces(); 
+            }
         });
         this.value = ""; 
     });
     document.getElementById('imageChangeInput').addEventListener('change', function(event) {
-        var file = event.target.files[0], index = parseInt(this.dataset.markerIndex);
-        if (isNaN(index) || !file) return;
+        var file = event.target.files[0], id = this.dataset.markerId;
+        if (!id || !file) return;
         compressImage(file, function(dataUrl) {
-            myPlaces[index].imageSrc = dataUrl; 
-            showImage(index); 
-            savePlaces(); 
+            var placeData = allPlaces.find(p => p.id === id);
+            if (placeData) {
+                placeData.imageSrc = dataUrl; 
+                showImage(id); 
+                savePlaces(); 
+            }
         });
         this.value = ""; 
     });
@@ -616,9 +692,15 @@ function initMapApp() {
 
     window.clearPlaces = function() {
         isAutoNavigating = false; if (navAnimationFrameId) cancelAnimationFrame(navAnimationFrameId); navAnimationFrameId = null;
-        myPlaces = []; placeMarkers.forEach(m => map.removeLayer(m)); placeMarkers = []; routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
-        activeMarkerIndex = null; for (var key in hideTimers) clearTimeout(hideTimers[key]); hideTimers = {};
+        allPlaces = []; categories = []; activeCategory = ""; 
+        placeMarkers.forEach(m => map.removeLayer(m.marker)); placeMarkers = []; routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
+        activeMarkerId = null; for (var key in hideTimers) clearTimeout(hideTimers[key]); hideTimers = {};
         localStorage.removeItem('myMapPlaces'); 
+        
+        activeCategory = "සාමාන්‍ය";
+        categories.push(activeCategory);
+        updateCategoryDropdown();
+        renderPlaces();
     };
 
     function startLiveTracking() { 
