@@ -107,18 +107,6 @@ button.restore { background: #ffc107; color: black; }
     font-size: 15px; font-weight: bold; margin-bottom: -12px; z-index: 1; position: relative;
     box-shadow: 0 2px 6px rgba(0,0,0,0.4); white-space: nowrap; border: 2px solid #1A73E8;
 }
-
-/* Copy Modal එකේ සැකසුම් */
-#copyModal {
-    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-    background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center;
-}
-#copyModalBox {
-    background: #fff; padding: 15px; border-radius: 10px; width: 90%; max-width: 400px; box-sizing: border-box;
-}
-#copyTextData {
-    width: 100%; height: 200px; font-size: 10px; box-sizing: border-box; margin-top: 10px; border: 1px solid #ccc;
-}
 </style>
 
 <div id="map"></div>
@@ -142,18 +130,6 @@ button.restore { background: #ffc107; color: black; }
 <input type="file" id="imageInput" accept="image/*" style="display: none;">
 <input type="file" id="imageChangeInput" accept="image/*" style="display: none;">
 <input type="file" id="importFile" accept=".txt,.json" style="display: none;">
-
-<!-- Median App එකට හරියන ලෙස Copy කරගැනීමේ කොටුව -->
-<div id="copyModal">
-    <div id="copyModalBox">
-        <p style="font-size:14px; margin:0 0 10px 0; font-weight:bold; text-align:center;">
-            1. පහත කේතය පිටපත් කරගන්න (Copy)<br>
-            2. අනිත් දුරකථනයේ හෝ Note එකක දාන්න
-        </p>
-        <textarea id="copyTextData" readonly></textarea>
-        <button onclick="document.getElementById('copyModal').style.display='none'" style="width:100%; margin-top:10px; padding:10px;">වසන්න</button>
-    </div>
-</div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -312,57 +288,25 @@ function initMapApp() {
         }
     }
 
-    // Backup ගැනීම Median App එකට හරියන ලෙස (Share API සහ Copy Text)
+    // සාමාන්‍ය බ්‍රවුසර් එකක් මෙන් Text File එකක් Download වීමට (Blob තාක්ෂණය භාවිතා කරයි)
     window.exportData = function() {
         if (myPlaces.length === 0) { alert("කරුණාකර මුලින්ම ස්ථානයක් එක් කරන්න."); return; }
         
         var dataStr = JSON.stringify(myPlaces);
+        var blob = new Blob([dataStr], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
         
-        // Android Share API භාවිතා කර File එකක් ලෙස යැවීම (Median App සඳහා හොඳම ක්‍රමය)
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [] })) {
-            try {
-                var file = new File([dataStr], 'map_data.txt', { type: 'application/json' });
-                var filesArray = [file];
-                
-                if (navigator.canShare({ files: filesArray })) {
-                    navigator.share({
-                        files: filesArray,
-                        title: 'Map Backup',
-                        text: 'මෙය ඔබගේ මැප් දත්ත ගොනුවයි. මෙය Save කරගන්න.'
-                    }).catch((error) => {
-                        console.error('Sharing failed', error);
-                        showCopyText(dataStr);
-                    });
-                    return;
-                }
-            } catch(e) {
-                console.error("File share error", e);
-            }
-        }
-
-        // සාමාන්‍ය බ්‍රවුසර් එකක් නම් Download කිරීමට උත්සාහ කිරීම
-        var dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-        var exportFileDefaultName = 'map_data.txt';
-        var linkElement = document.createElement('a');
-        linkElement.setAttribute('href', dataUri);
-        linkElement.setAttribute('download', exportFileDefaultName);
-        linkElement.click();
-
-        // එසේ නොහැකි නම් Text එක පෙන්වීම
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'map_data.txt';
+        document.body.appendChild(a);
+        a.click();
+        
         setTimeout(function() {
-            if (!navigator.share) {
-                showCopyText(dataStr);
-            }
-        }, 500);
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 200);
     };
-
-    function showCopyText(text) {
-        var modal = document.getElementById('copyModal');
-        var textArea = document.getElementById('copyTextData');
-        textArea.value = text;
-        modal.style.display = 'flex';
-        textArea.select();
-    }
 
     document.getElementById('importFile').addEventListener('change', function(event) {
         var file = event.target.files[0];
