@@ -6,11 +6,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <!-- Cache Control Meta Tags (App එකේ දත්ත මතකයේ තබාගෙන නැතිව අලුතින් ගෙනහැර පෙන්වයි) -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    
+    <!-- Android WebView Cache Bypass Trick (App එක අරින සෑම වතාවකදීම අලුතින් ගෙනහැර පෙන්වයි) -->
+    <script>
+        if (!window.location.href.includes('nocache=')) {
+            var sep = window.location.href.includes('?') ? '&' : '?';
+            window.location.replace(window.location.href + sep + 'nocache=' + Date.now());
+        }
+    </script>
+
     <title>හරියටම ගූගල් මැප්ස් වගේ පාර</title>
 
     <!-- LZ-String Compression Library -->
@@ -136,7 +139,7 @@
     var CONFIG = {
         GITHUB_TOKEN: "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", // ඔබගේ GitHub Token එක මෙතන දාන්න.
         IMAGE_HIDE_TIME: 3,        // ඡායාරූපය පෙන්වෙන තත්පර ගණන (උදා: 3)
-        AUTO_NAVIGATE: false,       // ස්වයංක්‍රීය ගමනය ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
+        AUTO_NAVIGATE: true,       // ස්වයංක්‍රීය ගමනය ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
         LIVE_TRACKING: true        // ලයිව් ලොකේෂන් ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
     };
     // =====================================================================
