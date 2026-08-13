@@ -91,9 +91,26 @@
         .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #1A73E8; }
         input:checked + .slider:before { transform: translateX(26px); }
+
+        /* Error Screen Styles */
+        #errorScreen {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: #f8f9fa; z-index: 9999; justify-content: center; align-items: center; 
+            flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;
+        }
+        #errorScreen h1 { font-size: 60px; margin: 0; }
+        #errorScreen h2 { color: #dc3545; margin-top: 10px; }
+        #errorScreen p { color: #555; font-size: 14px; margin-top: 5px; }
     </style>
 </head>
 <body>
+
+    <!-- Error Screen (අංකය 2 විට පෙන්වයි) -->
+    <div id="errorScreen">
+        <h1>⛔</h1>
+        <h2>මෙම යෙදුම තාවකාලිකව අක්‍රීය කර ඇත.</h2>
+        <p>කරුණාකර පසුව නැවත උත්සහ කරන්න.</p>
+    </div>
 
     <div id="map"></div>
 
@@ -177,7 +194,71 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+    // =====================================================================
+    // යෙදුමේ සැකසුම් (APP SETTINGS)
+    // මෙතනින් පහත දේවල් ඔබට පහසුවෙන් වෙනස් කරගත හැකියි. 
+    // වෙබ් අඩවියට දාන්න කලින් මේක වෙනස් කරගන්න.
+    // =====================================================================
+    var CONFIG = {
+        APP_VERSION: "1.0.0",    // අලුත් Update එකක් දාද්දී මේක වෙනස් කරන්න (උදා: 1.0.1). එවිට App එක වහාම Refresh වේ.
+        APP_STATUS: 1,           // යෙදුම ක්‍රියාත්මක කිරීමට 1 දාන්න. අක්‍රීය කිරීමට(වැඩ නොකිරීමට) 2 දාන්න.
+        GITHUB_TOKEN: "",        // GitHub Token එක මෙතන දාන්න (නැත්නම් App එක ඇතුළෙන් ⚙️ ඔබා දාන්න).
+        IMAGE_HIDE_TIME: 3,      // ඡායාරූපය පෙන්වෙන තත්පර ගණන (උදා: 3)
+        AUTO_NAVIGATE: true,     // ස්වයංක්‍රීය ගමනය ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
+        LIVE_TRACKING: true      // ලයිව් ලොකේෂන් ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
+    };
+    // =====================================================================
+
+    var isErrorShowing = false;
+
+    function showErrorScreen() {
+        if (isErrorShowing) return;
+        isErrorShowing = true;
+        document.getElementById('errorScreen').style.display = 'flex';
+        document.getElementById('map').style.display = 'none';
+        document.querySelector('.controls').style.display = 'none';
+        document.getElementById('recenter-btn').style.display = 'none';
+        document.getElementById('status').style.display = 'none';
+    }
+
+    function checkForUpdates() {
+        fetch(window.location.href.split('?')[0] + '?updatecheck=' + Date.now())
+        .then(res => res.text())
+        .then(html => {
+            // Extract APP_STATUS
+            var statusMatch = html.match(/APP_STATUS:\s*(\d)/);
+            var newStatus = statusMatch ? parseInt(statusMatch[1]) : 1;
+
+            if (newStatus === 2) {
+                showErrorScreen();
+            } else {
+                if (isErrorShowing) {
+                    window.location.reload(); // Was error, now it's 1. Reload to restore app.
+                }
+                
+                // Extract APP_VERSION
+                var versionMatch = html.match(/APP_VERSION:\s*"([^"]+)"/);
+                var newVersion = versionMatch ? versionMatch[1] : "0";
+                
+                if (newVersion !== CONFIG.APP_VERSION) {
+                    window.location.reload(); // Version changed! Reload to apply updates.
+                }
+            }
+        })
+        .catch(err => {
+            // Network error, ignore and try again later
+        });
+    }
+
+    setInterval(checkForUpdates, 30000); // Check every 30 seconds
+
     function initMapApp() {
+        // අංකය 2 නම් යෙදුම අක්‍රීය කර Error එක පෙන්වයි
+        if (CONFIG.APP_STATUS === 2) {
+            showErrorScreen();
+            return;
+        }
+
         var map = L.map('map', { zoomControl: false, attributionControl: false, doubleClickZoom: false, inertia: true, inertiaDeceleration: 2000, zoomAnimation: true, keepBuffer: 2, updateWhenZooming: false }).setView([7.8731, 80.7718], 7);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
@@ -191,7 +272,6 @@
         var tempLatLng = null, activeMarkerId = null, clickTimeout = null, preventSingleClick = false, hideTimers = {};
         var audioCtx = null, hasBeepedForTarget = false, latestExactLocation = null, pressTimer = null, isLongPress = false;
 
-        // සැකසුම් දත්ත ගබඩා කරන ක්‍රමය
         var appSettings = {
             githubToken: "",
             imageHideTime: 3,
@@ -208,7 +288,6 @@
                 appSettings.autoNavigate = parsed.autoNavigate !== undefined ? parsed.autoNavigate : true;
                 appSettings.liveTracking = parsed.liveTracking !== undefined ? parsed.liveTracking : true;
             }
-            // UI වලට දත්ත දානවා
             document.getElementById('settingsToken').value = appSettings.githubToken;
             document.getElementById('settingsHideTime').value = appSettings.imageHideTime;
             document.getElementById('settingsAutoNav').checked = appSettings.autoNavigate;
@@ -228,7 +307,6 @@
             localStorage.setItem('appSettings', JSON.stringify(appSettings));
             document.getElementById('settingsModal').style.display = 'none';
             
-            // Live Tracking එක On/Off කිරීම
             if (appSettings.liveTracking && !watchId) {
                 startLiveTracking();
             } else if (!appSettings.liveTracking && watchId) {
@@ -427,12 +505,12 @@
                     document.getElementById('status').style.display = 'none';
                     showServerCodeModal(data.id);
                 } else {
-                    throw new Error("GitHub API Error: " + (data.message || "Unknown"));
+                    throw new Error("GitHub API Error");
                 }
             })
             .catch(err => {
                 document.getElementById('status').style.display = 'none';
-                alert("❌ සෙවුර් එකට යැවීමේ දෝෂයකි. Token එක සහ අයින්ටර්නෙට් එක පරීක්ෂා කරන්න. හෝ ⚙️ සැකසුම් වල Token එක හරියට දාලා තියෙනවද බලන්න.");
+                alert("❌ සෙවුර් එකට යැවීමේ දෝෂයකි. Token එක සහ අයින්ටර්නෙට් එක පරීක්ෂා කරන්න.");
             });
         };
 
@@ -570,7 +648,7 @@
 
         function addPlace() {
             var name = document.getElementById('placeName').value;
-            var timeToHide = appSettings.imageHideTime; // සැකසුම් වලින් ගන්නවා
+            var timeToHide = appSettings.imageHideTime; 
             if (!tempLatLng) { alert("කරුණාකර මුලින්ම මැප් එකේ හිස් තැනක් අත තදන්න."); return; }
             if (!name) name = "ස්ථානය " + (allPlaces.filter(p => p.category === activeCategory).length + 1);
 
@@ -586,7 +664,6 @@
             if (activePlaces.length === 1) { startPoint = liveMarker ? liveMarker.getLatLng() : map.getCenter(); } 
             else { startPoint = activePlaces[activePlaces.length - 2].latlng; }
             
-            // සැකසුම් වල Auto Navigate එක On දැයි බලනවා
             drawPerfectRoute(startPoint, endPoint, appSettings.autoNavigate);
             tempLatLng = null; document.getElementById('placeName').value = "";
             savePlaces(); 
@@ -770,7 +847,7 @@
 
         function startLiveTracking() { 
             if (watchId) return; 
-            if (!appSettings.liveTracking) return; // සැකසුම් වලින් Off කරලා නම් වැඩ කරන්නේ නැහැ
+            if (!appSettings.liveTracking) return;
             
             document.getElementById('status').style.display = 'block';
             document.getElementById('status').innerText = "📍 ලයිව් ලොකේෂන් සොයමින් පවතී...";
@@ -818,7 +895,6 @@
 
         window.addPlace = addPlace;
 
-        // යෙදුම ආරම්භ වීමේදී සැකසුම් පූරණය කරයි
         loadSettings();
         startLiveTracking();
         loadPlaces(); 
