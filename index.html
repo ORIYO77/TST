@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <!-- Android WebView Cache Bypass Trick (App එක අරින සෑම වතාවකදීම අලුතින් ගෙනහැර පෙන්වයි) -->
+    <!-- Android WebView Cache Bypass Trick -->
     <script>
         if (!window.location.href.includes('nocache=')) {
             var sep = window.location.href.includes('?') ? '&' : '?';
@@ -56,6 +56,7 @@
         button.backup { background: #28a745; }
         button.restore { background: #ffc107; color: black; }
         button.addCat { background: #6c757d; }
+        button.settings { background: #fff; color: #1A73E8; font-size: 18px; padding: 4px 10px; min-width: 40px; border: 1px solid #ddd; }
 
         #status {
             position: absolute; top: 150px; left: 50%; transform: translateX(-50%); padding: 8px 15px;
@@ -78,34 +79,32 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
         .modal-box { background: #fff; padding: 15px; border-radius: 10px; width: 100%; max-width: 400px; box-sizing: border-box; display: flex; flex-direction: column; }
         .modal textarea { width: 100%; height: 120px; font-size: 12px; box-sizing: border-box; margin-top: 10px; border: 1px solid #ccc; border-radius: 5px; padding: 8px; }
-
-        /* Error Screen Styles */
-        #errorScreen {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: #f8f9fa; z-index: 9999; justify-content: center; align-items: center; 
-            flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;
-        }
-        #errorScreen h1 { font-size: 60px; margin: 0; }
-        #errorScreen h2 { color: #dc3545; margin-top: 10px; }
-        #errorScreen p { color: #555; font-size: 14px; margin-top: 5px; }
+        
+        .setting-row { display: flex; flex-direction: column; margin-bottom: 15px; text-align: left; }
+        .setting-row label { font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #333; }
+        .setting-row input[type="text"], .setting-row input[type="number"] { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .toggle-row label { font-size: 13px; font-weight: bold; color: #333; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #1A73E8; }
+        input:checked + .slider:before { transform: translateX(26px); }
     </style>
 </head>
 <body>
 
-    <!-- Error Screen (අංකය 2 විට පෙන්වයි) -->
-    <div id="errorScreen">
-        <h1>⛔</h1>
-        <h2>මෙම යෙදුම තාවකාලිකව අක්‍රීය කර ඇත.</h2>
-        <p>කරුණාකර පසුව නැවත උත්සහ කරන්න.</p>
-    </div>
-
     <div id="map"></div>
 
     <div class="controls">
-        <div class="row">
-            <select id="categorySelect" onchange="changeCategory()"></select>
-            <button onclick="addNewCategory()" class="addCat">➕ කාණ්ඩය</button>
-            <button onclick="deleteCategory()" class="clear">🗑️</button>
+        <div class="row" style="justify-content: space-between;">
+            <div class="row" style="flex: 1; gap: 5px;">
+                <select id="categorySelect" onchange="changeCategory()"></select>
+                <button onclick="addNewCategory()" class="addCat">➕ කාණ්ඩය</button>
+                <button onclick="deleteCategory()" class="clear">🗑️</button>
+            </div>
+            <button onclick="showSettingsModal()" class="settings">⚙️</button>
         </div>
         <div class="row">
             <input type="text" id="placeName" placeholder="ස්ථානයේ නම">
@@ -122,6 +121,36 @@
 
     <input type="file" id="imageInput" accept="image/*" style="display: none;">
     <input type="file" id="imageChangeInput" accept="image/*" style="display: none;">
+
+    <!-- සැකසුම් පුවරුව (Settings Modal) -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-box">
+            <p style="font-size:16px; margin:0 0 15px 0; font-weight:bold; text-align:center; border-bottom: 1px solid #eee; padding-bottom: 10px;">⚙️ යෙදුම් සැකසුම්</p>
+            
+            <div class="setting-row">
+                <label>GitHub Token එක (ghp_...)</label>
+                <input type="text" id="settingsToken" placeholder="Token එක මෙතන දාන්න">
+            </div>
+
+            <div class="setting-row">
+                <label>ඡායාරූපය සැඟවෙන කාලය (තත්පර)</label>
+                <input type="number" id="settingsHideTime" value="3" min="1" max="30">
+            </div>
+
+            <div class="toggle-row">
+                <label>ස්වයංක්‍රීය ගමනය (Auto Navigate)</label>
+                <label class="switch"><input type="checkbox" id="settingsAutoNav" checked><span class="slider"></span></label>
+            </div>
+
+            <div class="toggle-row">
+                <label>ලයිව් ලොකේෂන් (Live Tracking)</label>
+                <label class="switch"><input type="checkbox" id="settingsLiveTrack" checked><span class="slider"></span></label>
+            </div>
+
+            <button onclick="saveSettings()" style="width:100%; margin-top:10px; padding:12px; background:#1A73E8; color:white; border:none; border-radius:6px; font-weight:bold;">සුරකින්න</button>
+            <button onclick="document.getElementById('settingsModal').style.display='none'" style="width:100%; margin-top:5px; padding:10px; background:#555; color:white; border:none; border-radius:6px;">වසන්න</button>
+        </div>
+    </div>
 
     <div id="serverCodeModal" class="modal">
         <div class="modal-box">
@@ -148,31 +177,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-    // =====================================================================
-    // යෙදුමේ සැකසුම් (APP SETTINGS)
-    // මෙතනින් පහත දේවල් ඔබට පහසුවෙන් වෙනස් කරගත හැකියි. 
-    // වෙබ් අඩවියට දාන්න කලින් මේක වෙනස් කරගන්න.
-    // =====================================================================
-    var CONFIG = {
-        APP_STATUS: 1,           // යෙදුම ක්‍රියාත්මක කිරීමට 1 දාන්න. අක්‍රීය කිරීමට(වැඩ නොකිරීමට) 2 දාන්න.
-        GITHUB_TOKEN: "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", // ඔබගේ GitHub Token එක මෙතන දාන්න.
-        IMAGE_HIDE_TIME: 3,        // ඡායාරූපය පෙන්වෙන තත්පර ගණන (උදා: 3)
-        AUTO_NAVIGATE: true,       // ස්වයංක්‍රීය ගමනය ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
-        LIVE_TRACKING: true        // ලයිව් ලොකේෂන් ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
-    };
-    // =====================================================================
-
     function initMapApp() {
-        // අංකය 2 නම් යෙදුම අක්‍රීය කර Error එක පෙන්වයි
-        if (CONFIG.APP_STATUS === 2) {
-            document.getElementById('errorScreen').style.display = 'flex';
-            document.getElementById('map').style.display = 'none';
-            document.querySelector('.controls').style.display = 'none';
-            document.getElementById('recenter-btn').style.display = 'none';
-            document.getElementById('status').style.display = 'none';
-            return; // යෙදුම මෙතනින් නතර වේ. ඉහළ කේත ක්‍රියාත්මක නොවේ.
-        }
-
         var map = L.map('map', { zoomControl: false, attributionControl: false, doubleClickZoom: false, inertia: true, inertiaDeceleration: 2000, zoomAnimation: true, keepBuffer: 2, updateWhenZooming: false }).setView([7.8731, 80.7718], 7);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
@@ -185,6 +190,55 @@
         var currentHeading = 0, targetHeading = 0, startHeading = 0, headingStartTime = 0, headingDuration = 300, isRotating = false;
         var tempLatLng = null, activeMarkerId = null, clickTimeout = null, preventSingleClick = false, hideTimers = {};
         var audioCtx = null, hasBeepedForTarget = false, latestExactLocation = null, pressTimer = null, isLongPress = false;
+
+        // සැකසුම් දත්ත ගබඩා කරන ක්‍රමය
+        var appSettings = {
+            githubToken: "",
+            imageHideTime: 3,
+            autoNavigate: true,
+            liveTracking: true
+        };
+
+        function loadSettings() {
+            var saved = localStorage.getItem('appSettings');
+            if (saved) {
+                var parsed = JSON.parse(saved);
+                appSettings.githubToken = parsed.githubToken || "";
+                appSettings.imageHideTime = parsed.imageHideTime || 3;
+                appSettings.autoNavigate = parsed.autoNavigate !== undefined ? parsed.autoNavigate : true;
+                appSettings.liveTracking = parsed.liveTracking !== undefined ? parsed.liveTracking : true;
+            }
+            // UI වලට දත්ත දානවා
+            document.getElementById('settingsToken').value = appSettings.githubToken;
+            document.getElementById('settingsHideTime').value = appSettings.imageHideTime;
+            document.getElementById('settingsAutoNav').checked = appSettings.autoNavigate;
+            document.getElementById('settingsLiveTrack').checked = appSettings.liveTracking;
+        }
+
+        window.showSettingsModal = function() {
+            document.getElementById('settingsModal').style.display = 'flex';
+        };
+
+        window.saveSettings = function() {
+            appSettings.githubToken = document.getElementById('settingsToken').value.trim();
+            appSettings.imageHideTime = parseInt(document.getElementById('settingsHideTime').value) || 3;
+            appSettings.autoNavigate = document.getElementById('settingsAutoNav').checked;
+            appSettings.liveTracking = document.getElementById('settingsLiveTrack').checked;
+            
+            localStorage.setItem('appSettings', JSON.stringify(appSettings));
+            document.getElementById('settingsModal').style.display = 'none';
+            
+            // Live Tracking එක On/Off කිරීම
+            if (appSettings.liveTracking && !watchId) {
+                startLiveTracking();
+            } else if (!appSettings.liveTracking && watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                document.getElementById('status').style.display = 'none';
+            }
+            
+            alert("✅ සැකසුම් සුරැකිණි!");
+        };
 
         function initAudio() { if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} } if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); }
         function playBeepMultiple(times) {
@@ -340,7 +394,7 @@
         // --- CLOUD SERVER BACKUP LOGIC (GITHUB GIST) ---
         window.uploadToServer = function() {
             if (allPlaces.length === 0) { alert("කරුණාකර මුලින්ම ස්ථානයක් එක් කරන්න."); return; }
-            if (!CONFIG.GITHUB_TOKEN || CONFIG.GITHUB_TOKEN.includes("ඔබගෝ")) { alert("කරුණාකර කේතයේ CONFIG එකේ GITHUB_TOKEN එක දාන්න!"); return; }
+            if (!appSettings.githubToken) { alert("කරුණාකර ⚙️ සැකසුම් වලට ගිහින් GitHub Token එක දාන්න!"); return; }
             
             document.getElementById('status').innerText = "☁️ GitHub සෙවුර් එකට යවමින්...";
             document.getElementById('status').style.display = 'block';
@@ -354,7 +408,7 @@
             fetch('https://api.github.com/gists', {
                 method: 'POST',
                 headers: {
-                    'Authorization': 'token ' + CONFIG.GITHUB_TOKEN,
+                    'Authorization': 'token ' + appSettings.githubToken,
                     'Accept': 'application/vnd.github.v3+json'
                 },
                 body: JSON.stringify({
@@ -373,12 +427,12 @@
                     document.getElementById('status').style.display = 'none';
                     showServerCodeModal(data.id);
                 } else {
-                    throw new Error("GitHub API Error");
+                    throw new Error("GitHub API Error: " + (data.message || "Unknown"));
                 }
             })
             .catch(err => {
                 document.getElementById('status').style.display = 'none';
-                alert("❌ සෙවුර් එකට යැවීමේ දෝෂයකි. Token එක සහ අයින්ටර්නෙට් එක පරීක්ෂා කරන්න.");
+                alert("❌ සෙවුර් එකට යැවීමේ දෝෂයකි. Token එක සහ අයින්ටර්නෙට් එක පරීක්ෂා කරන්න. හෝ ⚙️ සැකසුම් වල Token එක හරියට දාලා තියෙනවද බලන්න.");
             });
         };
 
@@ -401,14 +455,14 @@
         window.processServerRestore = function() {
             var code = document.getElementById('serverRestoreText').value.trim();
             if (!code) { alert("කරුණාකර Server Code එක දාන්න."); return; }
-            if (!CONFIG.GITHUB_TOKEN || CONFIG.GITHUB_TOKEN.includes("ඔබගෝ")) { alert("කරුණාකර කේතයේ CONFIG එකේ GITHUB_TOKEN එක දාන්න!"); return; }
+            if (!appSettings.githubToken) { alert("කරුණාකර ⚙️ සැකසුම් වලට ගිහින් GitHub Token එක දාන්න!"); return; }
 
             document.getElementById('status').innerText = "☁️ GitHub සෙවුර් එකෙන් ගෙනාමින්...";
             document.getElementById('status').style.display = 'block';
 
             fetch('https://api.github.com/gists/' + code, {
                 headers: {
-                    'Authorization': 'token ' + CONFIG.GITHUB_TOKEN,
+                    'Authorization': 'token ' + appSettings.githubToken,
                     'Accept': 'application/vnd.github.v3+json'
                 }
             })
@@ -516,7 +570,7 @@
 
         function addPlace() {
             var name = document.getElementById('placeName').value;
-            var timeToHide = CONFIG.IMAGE_HIDE_TIME; // CONFIG එකෙන් ගන්නවා
+            var timeToHide = appSettings.imageHideTime; // සැකසුම් වලින් ගන්නවා
             if (!tempLatLng) { alert("කරුණාකර මුලින්ම මැප් එකේ හිස් තැනක් අත තදන්න."); return; }
             if (!name) name = "ස්ථානය " + (allPlaces.filter(p => p.category === activeCategory).length + 1);
 
@@ -532,8 +586,8 @@
             if (activePlaces.length === 1) { startPoint = liveMarker ? liveMarker.getLatLng() : map.getCenter(); } 
             else { startPoint = activePlaces[activePlaces.length - 2].latlng; }
             
-            // CONFIG එකේ AUTO_NAVIGATE එක true නම් වාහනය යයි
-            drawPerfectRoute(startPoint, endPoint, CONFIG.AUTO_NAVIGATE);
+            // සැකසුම් වල Auto Navigate එක On දැයි බලනවා
+            drawPerfectRoute(startPoint, endPoint, appSettings.autoNavigate);
             tempLatLng = null; document.getElementById('placeName').value = "";
             savePlaces(); 
         }
@@ -716,7 +770,7 @@
 
         function startLiveTracking() { 
             if (watchId) return; 
-            if (!CONFIG.LIVE_TRACKING) return; // CONFIG එකේ LIVE_TRACKING එක false නම් වැඩ කරන්නේ නැහැ
+            if (!appSettings.liveTracking) return; // සැකසුම් වලින් Off කරලා නම් වැඩ කරන්නේ නැහැ
             
             document.getElementById('status').style.display = 'block';
             document.getElementById('status').innerText = "📍 ලයිව් ලොකේෂන් සොයමින් පවතී...";
@@ -764,6 +818,8 @@
 
         window.addPlace = addPlace;
 
+        // යෙදුම ආරම්භ වීමේදී සැකසුම් පූරණය කරයි
+        loadSettings();
         startLiveTracking();
         loadPlaces(); 
 
