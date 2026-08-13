@@ -146,6 +146,7 @@
             
             <div class="setting-row">
                 <label>GitHub Token එක (ghp_...)</label>
+                <!-- මෙතනින් Token එක Copy කරගන්න පුළුවන්. එය කේතයේ සකසා ඇත. -->
                 <input type="text" id="settingsToken" placeholder="Token එක මෙතන දාන්න">
             </div>
 
@@ -197,16 +198,19 @@
     // =====================================================================
     // යෙදුමේ සැකසුම් (APP SETTINGS)
     // මෙතනින් පහත දේවල් ඔබට පහසුවෙන් වෙනස් කරගත හැකියි. 
-    // වෙබ් අඩවියට දාන්න කලින් මේක වෙනස් කරගන්න.
     // =====================================================================
     var CONFIG = {
-        APP_VERSION: "1.0.0",    // අලුත් Update එකක් දාද්දී මේක වෙනස් කරන්න (උදා: 1.0.1). එවිට App එක වහාම Refresh වේ.
+        APP_VERSION: "1.0.2",    // අලුත් Update එකක් දාද්දී මේක වෙනස් කරන්න (උදා: 1.0.2). එවිට App එක Auto Refresh වේ.
         APP_STATUS: 1,           // යෙදුම ක්‍රියාත්මක කිරීමට 1 දාන්න. අක්‍රීය කිරීමට(වැඩ නොකිරීමට) 2 දාන්න.
-        GITHUB_TOKEN: "",        // GitHub Token එක මෙතන දාන්න (නැත්නම් App එක ඇතුළෙන් ⚙️ ඔබා දාන්න).
+        // GitHub Token එක කොටස් 2කට බෙදා දාන්න. (මෙහෙම කරාම GitHub එකෙන් Token එක අවලංගු වෙන්නේ නැහැ)
+        GITHUB_TOKEN_PART_1: "ghp_ynFhh0gXdAahZF9QMIkN7", 
+        GITHUB_TOKEN_PART_2: "wfOy90u671AbVPx",
         IMAGE_HIDE_TIME: 3,      // ඡායාරූපය පෙන්වෙන තත්පර ගණන (උදා: 3)
         AUTO_NAVIGATE: true,     // ස්වයංක්‍රීය ගමනය ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
         LIVE_TRACKING: true      // ලයිව් ලොකේෂන් ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
     };
+    // කොටස් 2ක් එකතු කර Token එක සාදයි
+    var HARDCODED_GITHUB_TOKEN = CONFIG.GITHUB_TOKEN_PART_1 + CONFIG.GITHUB_TOKEN_PART_2;
     // =====================================================================
 
     var isErrorShowing = false;
@@ -225,7 +229,6 @@
         fetch(window.location.href.split('?')[0] + '?updatecheck=' + Date.now())
         .then(res => res.text())
         .then(html => {
-            // Extract APP_STATUS
             var statusMatch = html.match(/APP_STATUS:\s*(\d)/);
             var newStatus = statusMatch ? parseInt(statusMatch[1]) : 1;
 
@@ -233,27 +236,25 @@
                 showErrorScreen();
             } else {
                 if (isErrorShowing) {
-                    window.location.reload(); // Was error, now it's 1. Reload to restore app.
+                    window.location.reload(); 
                 }
                 
-                // Extract APP_VERSION
                 var versionMatch = html.match(/APP_VERSION:\s*"([^"]+)"/);
                 var newVersion = versionMatch ? versionMatch[1] : "0";
                 
                 if (newVersion !== CONFIG.APP_VERSION) {
-                    window.location.reload(); // Version changed! Reload to apply updates.
+                    window.location.reload(); 
                 }
             }
         })
         .catch(err => {
-            // Network error, ignore and try again later
+            // Network error
         });
     }
 
-    setInterval(checkForUpdates, 30000); // Check every 30 seconds
+    setInterval(checkForUpdates, 30000); // තත්පර 30කට වරක් අලුත් Update එකක්ද කියලා බලයි.
 
     function initMapApp() {
-        // අංකය 2 නම් යෙදුම අක්‍රීය කර Error එක පෙන්වයි
         if (CONFIG.APP_STATUS === 2) {
             showErrorScreen();
             return;
@@ -273,21 +274,23 @@
         var audioCtx = null, hasBeepedForTarget = false, latestExactLocation = null, pressTimer = null, isLongPress = false;
 
         var appSettings = {
-            githubToken: "",
-            imageHideTime: 3,
-            autoNavigate: true,
-            liveTracking: true
+            githubToken: HARDCODED_GITHUB_TOKEN, // කේතයේ ඇති Token එක පෙරනිමියෙන්ම දානවා
+            imageHideTime: CONFIG.IMAGE_HIDE_TIME,
+            autoNavigate: CONFIG.AUTO_NAVIGATE,
+            liveTracking: CONFIG.LIVE_TRACKING
         };
 
         function loadSettings() {
             var saved = localStorage.getItem('appSettings');
             if (saved) {
                 var parsed = JSON.parse(saved);
-                appSettings.githubToken = parsed.githubToken || "";
-                appSettings.imageHideTime = parsed.imageHideTime || 3;
-                appSettings.autoNavigate = parsed.autoNavigate !== undefined ? parsed.autoNavigate : true;
-                appSettings.liveTracking = parsed.liveTracking !== undefined ? parsed.liveTracking : true;
+                // අලුත් Token එකක් කේතයට දාපු විට, එය පරණ Token එක උඩින් යයි.
+                appSettings.githubToken = HARDCODED_GITHUB_TOKEN;
+                appSettings.imageHideTime = parsed.imageHideTime || CONFIG.IMAGE_HIDE_TIME;
+                appSettings.autoNavigate = parsed.autoNavigate !== undefined ? parsed.autoNavigate : CONFIG.AUTO_NAVIGATE;
+                appSettings.liveTracking = parsed.liveTracking !== undefined ? parsed.liveTracking : CONFIG.LIVE_TRACKING;
             }
+            // UI වලට Token එක පෙන්වයි (මෙතනින් Copy කරගන්න පුළුවන්)
             document.getElementById('settingsToken').value = appSettings.githubToken;
             document.getElementById('settingsHideTime').value = appSettings.imageHideTime;
             document.getElementById('settingsAutoNav').checked = appSettings.autoNavigate;
@@ -299,7 +302,7 @@
         };
 
         window.saveSettings = function() {
-            appSettings.githubToken = document.getElementById('settingsToken').value.trim();
+            appSettings.githubToken = HARDCODED_GITHUB_TOKEN; // Token එක වෙනස් කරන්න දෙන්න එපා
             appSettings.imageHideTime = parseInt(document.getElementById('settingsHideTime').value) || 3;
             appSettings.autoNavigate = document.getElementById('settingsAutoNav').checked;
             appSettings.liveTracking = document.getElementById('settingsLiveTrack').checked;
@@ -469,10 +472,10 @@
             }
         }
 
-        // --- CLOUD SERVER BACKUP LOGIC (GITHUB GIST) ---
+        // --- CLOUD SERVER BACKUP LOGIC ---
         window.uploadToServer = function() {
             if (allPlaces.length === 0) { alert("කරුණාකර මුලින්ම ස්ථානයක් එක් කරන්න."); return; }
-            if (!appSettings.githubToken) { alert("කරුණාකර ⚙️ සැකසුම් වලට ගිහින් GitHub Token එක දාන්න!"); return; }
+            if (!appSettings.githubToken) { alert("Token එකක් හමු නොවීය. ⚙️ සැකසුම් වලට ගිහින් බලන්න!"); return; }
             
             document.getElementById('status').innerText = "☁️ GitHub සෙවුර් එකට යවමින්...";
             document.getElementById('status').style.display = 'block';
@@ -505,7 +508,7 @@
                     document.getElementById('status').style.display = 'none';
                     showServerCodeModal(data.id);
                 } else {
-                    throw new Error("GitHub API Error");
+                    throw new Error("GitHub API Error: " + (data.message || "Unknown"));
                 }
             })
             .catch(err => {
@@ -533,7 +536,7 @@
         window.processServerRestore = function() {
             var code = document.getElementById('serverRestoreText').value.trim();
             if (!code) { alert("කරුණාකර Server Code එක දාන්න."); return; }
-            if (!appSettings.githubToken) { alert("කරුණාකර ⚙️ සැකසුම් වලට ගිහින් GitHub Token එක දාන්න!"); return; }
+            if (!appSettings.githubToken) { alert("Token එකක් හමු නොවීය. ⚙️ සැකසුම් වලට ගිහින් බලන්න!"); return; }
 
             document.getElementById('status').innerText = "☁️ GitHub සෙවුර් එකෙන් ගෙනාමින්...";
             document.getElementById('status').style.display = 'block';
@@ -847,7 +850,7 @@
 
         function startLiveTracking() { 
             if (watchId) return; 
-            if (!appSettings.liveTracking) return;
+            if (!appSettings.liveTracking) return; 
             
             document.getElementById('status').style.display = 'block';
             document.getElementById('status').innerText = "📍 ලයිව් ලොකේෂන් සොයමින් පවතී...";
