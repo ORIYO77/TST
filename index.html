@@ -78,9 +78,26 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
         .modal-box { background: #fff; padding: 15px; border-radius: 10px; width: 100%; max-width: 400px; box-sizing: border-box; display: flex; flex-direction: column; }
         .modal textarea { width: 100%; height: 120px; font-size: 12px; box-sizing: border-box; margin-top: 10px; border: 1px solid #ccc; border-radius: 5px; padding: 8px; }
+
+        /* Error Screen Styles */
+        #errorScreen {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: #f8f9fa; z-index: 9999; justify-content: center; align-items: center; 
+            flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;
+        }
+        #errorScreen h1 { font-size: 60px; margin: 0; }
+        #errorScreen h2 { color: #dc3545; margin-top: 10px; }
+        #errorScreen p { color: #555; font-size: 14px; margin-top: 5px; }
     </style>
 </head>
 <body>
+
+    <!-- Error Screen (අංකය 2 විට පෙන්වයි) -->
+    <div id="errorScreen">
+        <h1>⛔</h1>
+        <h2>මෙම යෙදුම තාවකාලිකව අක්‍රීය කර ඇත.</h2>
+        <p>කරුණාකර පසුව නැවත උත්සහ කරන්න.</p>
+    </div>
 
     <div id="map"></div>
 
@@ -137,7 +154,8 @@
     // වෙබ් අඩවියට දාන්න කලින් මේක වෙනස් කරගන්න.
     // =====================================================================
     var CONFIG = {
-        GITHUB_TOKEN: "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", // ඔබගේ GitHub Token එක මෙතන දාන්න.
+        APP_STATUS: 1,           // යෙදුම ක්‍රියාත්මක කිරීමට 1 දාන්න. අක්‍රීය කිරීමට(වැඩ නොකිරීමට) 2 දාන්න.
+        GITHUB_TOKEN: "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", // ඔබගේ GitHub Token එක මෙතන දාන්න.
         IMAGE_HIDE_TIME: 3,        // ඡායාරූපය පෙන්වෙන තත්පර ගණන (උදා: 3)
         AUTO_NAVIGATE: true,       // ස්වයංක්‍රීය ගමනය ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
         LIVE_TRACKING: true        // ලයිව් ලොකේෂන් ඕනේනම් true, ඕනේ නැත්නම් false දාන්න.
@@ -145,6 +163,16 @@
     // =====================================================================
 
     function initMapApp() {
+        // අංකය 2 නම් යෙදුම අක්‍රීය කර Error එක පෙන්වයි
+        if (CONFIG.APP_STATUS === 2) {
+            document.getElementById('errorScreen').style.display = 'flex';
+            document.getElementById('map').style.display = 'none';
+            document.querySelector('.controls').style.display = 'none';
+            document.getElementById('recenter-btn').style.display = 'none';
+            document.getElementById('status').style.display = 'none';
+            return; // යෙදුම මෙතනින් නතර වේ. ඉහළ කේත ක්‍රියාත්මක නොවේ.
+        }
+
         var map = L.map('map', { zoomControl: false, attributionControl: false, doubleClickZoom: false, inertia: true, inertiaDeceleration: 2000, zoomAnimation: true, keepBuffer: 2, updateWhenZooming: false }).setView([7.8731, 80.7718], 7);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
