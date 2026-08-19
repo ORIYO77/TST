@@ -60,6 +60,8 @@
         button.backup { background: #28a745; }
         button.restore { background: #ffc107; color: black; }
         button.addCat { background: #6c757d; }
+        button.save-map { background: #17a2b8; } 
+        button.undo-route { background: #fd7e14; } 
         button.settings { background: #fff; color: #1A73E8; font-size: 18px; padding: 4px 10px; min-width: 40px; border: 1px solid #ddd; }
         button.map-type { background: #fff; color: #1A73E8; font-size: 16px; padding: 4px 10px; min-width: 40px; border: 1px solid #ddd; }
 
@@ -87,7 +89,7 @@
         
         .setting-row { display: flex; flex-direction: column; margin-bottom: 15px; text-align: left; }
         .setting-row label { font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #333; }
-        .setting-row input[type="text"], .setting-row input[type="number"] { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+        .setting-row input[type="text"], .setting-row input[type="number"], .setting-row select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
         .setting-row input[type="color"] { width: 100%; height: 40px; padding: 0; border: 1px solid #ccc; border-radius: 5px; cursor: pointer; }
         .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .toggle-row label { font-size: 13px; font-weight: bold; color: #333; }
@@ -121,6 +123,8 @@
                 <button onclick="addNewCategory()" class="addCat">➕</button>
                 <button onclick="clearPlaces()" class="clear">🗑️</button>
             </div>
+            <button onclick="undoLastDeleted()" class="undo-route" title="Undo Route">↩️</button> 
+            <button onclick="saveMapEdit()" class="save-map" title="Save Map">💾</button>
             <button onclick="toggleMapType()" class="map-type" id="mapTypeBtn">🗺️</button>
             <button onclick="showSettingsModal()" class="settings">⚙️</button>
         </div>
@@ -147,6 +151,16 @@
             <div class="setting-row">
                 <label>Server....id</label>
                 <input type="text" id="settingsToken" placeholder="Token එක මෙතන දාන්න">
+            </div>
+
+            <div class="setting-row">
+                <label>නාවිගේෂන් ඊතලයේ විලාසය (Arrow Style)</label>
+                <select id="settingsArrowStyle">
+                    <option value="circle">කවයක් තුළ ඊතලය (Circle)</option>
+                    <option value="flat">සරල ඊතලය (Flat)</option>
+                    <option value="3d">ත්‍රිමාණ ඊතලය (3D)</option>
+                    <option value="pointer">ඊතල දර්ශකය (Pointer)</option>
+                </select>
             </div>
 
             <div class="setting-row">
@@ -184,6 +198,21 @@
                 <label class="switch"><input type="checkbox" id="settingsLiveTrack" checked><span class="slider"></span></label>
             </div>
 
+            <div class="toggle-row">
+                <label>මගේ ලොකේෂන් බෙදාගන්න (Share My Live)</label>
+                <label class="switch"><input type="checkbox" id="settingsShareLive" onchange="generateLiveCodeIfChecked()"><span class="slider"></span></label>
+            </div>
+
+            <div class="setting-row">
+                <label>මගේ ලයිව් කේතය (My Live Code)</label>
+                <input type="text" id="settingsMyLiveCode" readonly placeholder="Share කරන්න මෙය පාවිච්චි කරන්න" onclick="this.select();">
+            </div>
+
+            <div class="setting-row">
+                <label>අනුගාමියාගේ ලයිව් කේතය (Remote Live Code)</label>
+                <input type="text" id="settingsRemoteCode" placeholder="අනිත් දුරකථනයේ Code එක දාන්න">
+            </div>
+
             <button onclick="saveSettings()" style="width:100%; margin-top:10px; padding:12px; background:#1A73E8; color:white; border:none; border-radius:6px; font-weight:bold;">SAVE</button>
             <button onclick="document.getElementById('settingsModal').style.display='none'" style="width:100%; margin-top:5px; padding:10px; background:#555; color:white; border:none; border-radius:6px;">BACK</button>
         </div>
@@ -217,22 +246,24 @@
     // =====================================================================
     // යෙදුමේ මූලික සැකසුම් (MASTER CONFIG)
     // ඔබට මේකෙන් ඕනෑම දෙයක් වෙනස් කරගත හැක. 
-    // මෙහි අගයන් වෙනස් කළ පසු, පහළ ඇති APP_VERSION එක අංකයක් වැඩි කරන්න (උදා: 1.0.9 සිට 1.1.0).
+    // මෙහි අගයන් වෙනස් කළ පසු, පහළ ඇති APP_VERSION එක අංකයක් වැඩි කරන්න (උදා: 1.2.2 සිට 1.2.3).
     // එවිට App එක ස්වයංක්‍රීයව අලුත් වී මේ සැකසුම් පාවිච්චි කරයි.
     // =====================================================================
     var CONFIG = {
-        APP_VERSION: "1.1.0",    // වෙනස්කම් කළ විට මේක වර්ධනය කරන්න (උදා: 1.1.1)
+        APP_VERSION: "1.2.3",    // වෙනස්කම් කළ නිසා අංකය 1.2.3 දක්වා වැඩි කර ඇත.
         APP_STATUS: 1,           // යෙදුම ක්‍රියාත්මක කිරීමට 1 දාන්න. අක්‍රීය කිරීමට 2 දාන්න.
         GITHUB_TOKEN_PART_1: "ghp_fii57hA8McI52veVpWrd", 
         GITHUB_TOKEN_PART_2: "63e7ESyIS540MftE",
-        IMAGE_HIDE_TIME: 3,      // ඡායාරූපය පෙන්වෙන තත්පර ගණන
-        AUTO_NAVIGATE: true,     // ස්වයංක්‍රීය ගමනය true / false
-        LIVE_TRACKING: true,     // ලයිව් ලොකේෂන් true / false
-        BEEP_COUNT: 6,           // සද්දය නිකුත් වෙන වාර ගණන
-        MARKER_COLOR: "#dc3545", // ලොකේෂන් මාර්ක් එකේ පාට
-        LABEL_COLOR: "#1A73E8",  // ලේබල් අකුරේ පාට
-        ROUTE_COLOR: "#4caf50",  // පාරේ ඉර පාට
-        PLACE_NAME_PREFIX: "ස්ථානය" // ස්ථානයක් එක් කරන විට පෙරනිමි නම (උදා: ස්ථානය 1)
+        IMAGE_HIDE_TIME: 3,      
+        AUTO_NAVIGATE: true,     
+        LIVE_TRACKING: true,     
+        BEEP_COUNT: 6,           
+        ARROW_STYLE: "circle",   
+        MARKER_COLOR: "#dc3545", 
+        LABEL_COLOR: "#1A73E8",  
+        ROUTE_COLOR: "#4caf50",  
+        PLACE_NAME_PREFIX: "ස්ථානය",
+        PUBLISHED_MAP_CODE: ""   
     };
     // =====================================================================
     var HARDCODED_GITHUB_TOKEN = CONFIG.GITHUB_TOKEN_PART_1 + CONFIG.GITHUB_TOKEN_PART_2;
@@ -304,8 +335,15 @@
         };
 
         var liveMarker = null, accuracyCircle = null, userInteracting = false, lastLatLng = null, watchId = null;
+        var remoteMarker = null, remoteFetchIntervalId = null, shareIntervalId = null;
+        
+        // Remote Marker චලිත කිරීම සඳහා Variables
+        var remoteStartLatLng = null, remoteTargetLatLng = null, remoteStartTime = 0, remoteDuration = 5000, remoteAnimFrameId = null;
+        var remoteCurrentHeading = 0, remoteTargetHeading = 0, remoteStartHeading = 0, remoteHeadingStartTime = 0, remoteHeadingDuration = 300, remoteIsRotating = false;
+        
         var allPlaces = [], categories = [], activeCategory = "";
-        var placeMarkers = [], routeLines = [];
+        var placeMarkers = [], routeLines = [], touchLines = [], routeLineMap = {}, touchLineMap = {};
+        var deletedConnections = []; 
         
         var isAutoNavigating = false, navPath = [], navIndex = 0, navStartTime = 0, navTotalDuration = 0, navStartLatLng = null, navTargetLatLng = null, navAnimationFrameId = null;
         var animationFrameId = null, startLatLng = null, targetLatLng = null, startTime = 0, duration = 1000;
@@ -327,7 +365,6 @@
             var saved = localStorage.getItem('appSettings');
             var parsed = saved ? JSON.parse(saved) : null;
             
-            // අලුත් Version එකක් ඇතිදැයි පරීක්ෂා කරයි. නම් නව CONFIG එක ලෝඩ් වේ.
             if (!parsed || parsed.appVersion !== CONFIG.APP_VERSION) {
                 appSettings = {
                     appVersion: CONFIG.APP_VERSION,
@@ -336,18 +373,23 @@
                     autoNavigate: CONFIG.AUTO_NAVIGATE,
                     liveTracking: CONFIG.LIVE_TRACKING,
                     beepCount: CONFIG.BEEP_COUNT,
+                    arrowStyle: CONFIG.ARROW_STYLE,
                     markerColor: CONFIG.MARKER_COLOR,
                     labelColor: CONFIG.LABEL_COLOR,
                     routeColor: CONFIG.ROUTE_COLOR,
-                    placeNamePrefix: CONFIG.PLACE_NAME_PREFIX
+                    placeNamePrefix: CONFIG.PLACE_NAME_PREFIX,
+                    shareMyLive: false,
+                    myLiveCode: "",
+                    remoteLiveCode: ""
                 };
                 localStorage.setItem('appSettings', JSON.stringify(appSettings));
             } else {
                 appSettings = parsed;
-                appSettings.githubToken = HARDCODED_GITHUB_TOKEN; // Token එක හැමවිටම Code එකෙන් ගනී
+                appSettings.githubToken = HARDCODED_GITHUB_TOKEN; 
             }
             
             document.getElementById('settingsToken').value = appSettings.githubToken;
+            document.getElementById('settingsArrowStyle').value = appSettings.arrowStyle;
             document.getElementById('settingsHideTime').value = appSettings.imageHideTime;
             document.getElementById('settingsBeepCount').value = appSettings.beepCount;
             document.getElementById('settingsMarkerColor').value = appSettings.markerColor;
@@ -355,6 +397,9 @@
             document.getElementById('settingsRouteColor').value = appSettings.routeColor;
             document.getElementById('settingsAutoNav').checked = appSettings.autoNavigate;
             document.getElementById('settingsLiveTrack').checked = appSettings.liveTracking;
+            document.getElementById('settingsShareLive').checked = appSettings.shareMyLive;
+            document.getElementById('settingsMyLiveCode').value = appSettings.myLiveCode || "";
+            document.getElementById('settingsRemoteCode').value = appSettings.remoteLiveCode || "";
             
             applyColors();
         }
@@ -363,8 +408,40 @@
             document.getElementById('settingsModal').style.display = 'flex';
         };
 
+        window.generateLiveCodeIfChecked = function() {
+            var isChecked = document.getElementById('settingsShareLive').checked;
+            if (isChecked && !appSettings.myLiveCode) {
+                document.getElementById('settingsMyLiveCode').value = "කේතය සෑදෙමින් පවතී...";
+                
+                var locData = JSON.stringify({ lat: latestExactLocation ? latestExactLocation.lat : 0, lng: latestExactLocation ? latestExactLocation.lng : 0, h: currentHeading, t: Date.now() });
+                var compressed = LZString.compressToBase64(locData);
+
+                fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'token ' + appSettings.githubToken, 'Accept': 'application/vnd.github.v3+json' },
+                    body: JSON.stringify({ "description": "Live Loc", "public": false, "files": { "live_loc.txt": { "content": compressed } } })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.id) {
+                        appSettings.myLiveCode = data.id;
+                        document.getElementById('settingsMyLiveCode').value = data.id;
+                        localStorage.setItem('appSettings', JSON.stringify(appSettings));
+                    } else {
+                        document.getElementById('settingsMyLiveCode').value = "කේතය සෑදිය නොහැකි විය. Token එක පරීක්ෂා කරන්න.";
+                        document.getElementById('settingsShareLive').checked = false;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('settingsMyLiveCode').value = "නෙට්වර්ක් දෝෂයකි.";
+                    document.getElementById('settingsShareLive').checked = false;
+                });
+            }
+        };
+
         window.saveSettings = function() {
             appSettings.githubToken = HARDCODED_GITHUB_TOKEN; 
+            appSettings.arrowStyle = document.getElementById('settingsArrowStyle').value;
             appSettings.imageHideTime = parseInt(document.getElementById('settingsHideTime').value) || 3;
             appSettings.beepCount = parseInt(document.getElementById('settingsBeepCount').value) || 6;
             appSettings.markerColor = document.getElementById('settingsMarkerColor').value;
@@ -372,6 +449,12 @@
             appSettings.routeColor = document.getElementById('settingsRouteColor').value;
             appSettings.autoNavigate = document.getElementById('settingsAutoNav').checked;
             appSettings.liveTracking = document.getElementById('settingsLiveTrack').checked;
+            
+            var prevShareState = appSettings.shareMyLive;
+            var prevRemoteCode = appSettings.remoteLiveCode;
+            
+            appSettings.shareMyLive = document.getElementById('settingsShareLive').checked;
+            appSettings.remoteLiveCode = document.getElementById('settingsRemoteCode').value.trim();
             
             localStorage.setItem('appSettings', JSON.stringify(appSettings));
             document.getElementById('settingsModal').style.display = 'none';
@@ -381,6 +464,8 @@
             savePlaces();
             renderPlaces();
             
+            if (liveMarker) liveMarker.setIcon(createArrowIcon(currentHeading));
+            
             if (appSettings.liveTracking && !watchId) {
                 startLiveTracking();
             } else if (!appSettings.liveTracking && watchId) {
@@ -388,8 +473,42 @@
                 watchId = null;
                 document.getElementById('status').style.display = 'none';
             }
+
+            if (appSettings.shareMyLive && !prevShareState) {
+                startSharingMyLive();
+            } else if (!appSettings.shareMyLive && prevShareState) {
+                stopSharingMyLive();
+            }
+
+            if (appSettings.remoteLiveCode !== prevRemoteCode) {
+                if (appSettings.remoteLiveCode) {
+                    startTrackingRemote();
+                } else {
+                    stopTrackingRemote();
+                }
+            }
             
-            alert("✅ සැකසුම් සුරැකිණි! වර්ණ සහ කාලය වෙනස් වී ඇත.");
+            alert("✅ සැකසුම් සුරැකිණි!");
+        };
+
+        window.saveMapEdit = function() {
+            savePlaces();
+            document.getElementById('status').innerText = "💾 සිතියම් වෙනස්කම් සහ මැකුම් සුරැකිණි!";
+            document.getElementById('status').style.display = 'block';
+            setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
+        };
+
+        window.undoLastDeleted = function() {
+            if (deletedConnections.length === 0) {
+                alert("මකාදමා ඇති පාරවල් නැත.");
+                return;
+            }
+            deletedConnections.pop();
+            savePlaces();
+            renderPlaces();
+            document.getElementById('status').innerText = "↩️ මැකු පාර නැවත එක් කරන ලදී.";
+            document.getElementById('status').style.display = 'block';
+            setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
         };
 
         function initAudio() { if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} } if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); }
@@ -412,16 +531,22 @@
         document.body.addEventListener('touchend', initAudio, { once: true });
 
         function savePlaces() {
-            try { localStorage.setItem('myMapPlaces', JSON.stringify({ places: allPlaces, categories: categories })); } 
+            try { localStorage.setItem('myMapPlaces', JSON.stringify({ places: allPlaces, categories: categories, deletedConn: deletedConnections })); } 
             catch(e) { console.error("Storage limit exceeded", e); alert("දුරකථනයේ මතකය පිරී ඇත. ඡායාරූප ගොනු කර Backup ගන්න."); }
         }
 
         function loadPlaces() {
+            if (CONFIG.PUBLISHED_MAP_CODE && CONFIG.PUBLISHED_MAP_CODE.trim() !== "") {
+                loadPublishedMap(CONFIG.PUBLISHED_MAP_CODE);
+                return;
+            }
+
             var saved = localStorage.getItem('myMapPlaces');
             if (saved) {
                 var data = JSON.parse(saved);
                 allPlaces = data.places || [];
                 categories = data.categories || [];
+                deletedConnections = data.deletedConn || [];
                 activeCategory = categories[0] || "";
                 updateCategoryDropdown();
                 renderPlaces();
@@ -430,6 +555,217 @@
                 categories.push(activeCategory);
                 updateCategoryDropdown();
             }
+        }
+
+        function loadPublishedMap(code) {
+            document.getElementById('status').innerText = "☁️ ප්‍රධාන සිතියම පූරණය වෙමින්...";
+            document.getElementById('status').style.display = 'block';
+
+            fetch('https://api.github.com/gists/' + code, {
+                headers: {
+                    'Authorization': 'token ' + HARDCODED_GITHUB_TOKEN,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.files && data.files["map_data.txt"]) {
+                    var compressed = data.files["map_data.txt"].content;
+                    var decompressed = LZString.decompressFromBase64(compressed);
+                    var parsedData = JSON.parse(decompressed);
+
+                    if (parsedData.p && parsedData.c) {
+                        if (parsedData.t) {
+                            appSettings.githubToken = parsedData.t;
+                            document.getElementById('settingsToken').value = parsedData.t;
+                        }
+                        if (parsedData.as) {
+                            appSettings.arrowStyle = parsedData.as;
+                            document.getElementById('settingsArrowStyle').value = parsedData.as;
+                            if (liveMarker) liveMarker.setIcon(createArrowIcon(currentHeading));
+                        }
+                        localStorage.setItem('appSettings', JSON.stringify(appSettings));
+
+                        allPlaces = parsedData.p.map(function(sp) {
+                            return {
+                                id: sp.id || (Date.now().toString() + Math.random().toString(36).substr(2, 5)),
+                                category: sp.c,
+                                latlng: sp.l,
+                                name: sp.n,
+                                hasImage: sp.i ? true : false,
+                                imageSrc: sp.i || "",
+                                hideTime: sp.h || 3,
+                                isVisible: false,
+                                isReached: sp.r ? true : false
+                            };
+                        });
+
+                        categories = parsedData.c || [];
+                        deletedConnections = parsedData.dc || [];
+                        
+                        activeCategory = categories[0] || "";
+                        updateCategoryDropdown();
+                        renderPlaces();
+                        document.getElementById('status').style.display = 'none';
+                    }
+                } else {
+                    throw "Invalid Published Code";
+                }
+            })
+            .catch(err => {
+                document.getElementById('status').style.display = 'none';
+                var saved = localStorage.getItem('myMapPlaces');
+                if (saved) {
+                    var data = JSON.parse(saved);
+                    allPlaces = data.places || [];
+                    categories = data.categories || [];
+                    deletedConnections = data.deletedConn || [];
+                    activeCategory = categories[0] || "";
+                    updateCategoryDropdown();
+                    renderPlaces();
+                }
+            });
+        }
+
+        // --- අන් අයට තමන්ගේ ස්ථානය ලයිව් බෙදාදීම (Share My Live) ---
+        function startSharingMyLive() {
+            if (!appSettings.githubToken) return;
+            if (shareIntervalId) clearInterval(shareIntervalId);
+
+            if (!appSettings.myLiveCode) {
+                generateLiveCodeIfChecked();
+            } else {
+                updateMyLiveGist();
+                shareIntervalId = setInterval(updateMyLiveGist, 5000); 
+            }
+        }
+
+        function updateMyLiveGist() {
+            if (!appSettings.myLiveCode || !latestExactLocation) return;
+            var locData = JSON.stringify({ lat: latestExactLocation.lat, lng: latestExactLocation.lng, h: currentHeading, t: Date.now() });
+            var compressed = LZString.compressToBase64(locData);
+
+            fetch('https://api.github.com/gists/' + appSettings.myLiveCode, {
+                method: 'PATCH',
+                headers: { 'Authorization': 'token ' + appSettings.githubToken, 'Accept': 'application/vnd.github.v3+json' },
+                body: JSON.stringify({ "files": { "live_loc.txt": { "content": compressed } } })
+            });
+        }
+
+        function stopSharingMyLive() {
+            if (shareIntervalId) { clearInterval(shareIntervalId); shareIntervalId = null; }
+            
+            // අනුගාමියාට තමන් ඔෆ්ලයින් බව දැනුම් දීම (Offline Signal)
+            if (appSettings.myLiveCode) {
+                var offlineData = JSON.stringify({ offline: true, t: Date.now() });
+                var compressed = LZString.compressToBase64(offlineData);
+                fetch('https://api.github.com/gists/' + appSettings.myLiveCode, {
+                    method: 'PATCH',
+                    headers: { 'Authorization': 'token ' + appSettings.githubToken, 'Accept': 'application/vnd.github.v3+json' },
+                    body: JSON.stringify({ "files": { "live_loc.txt": { "content": compressed } } })
+                });
+            }
+        }
+
+        // --- අනුගාමියාගේ ස්ථානය ලයිව් ලබාගැනීම (Track Remote Live) ---
+        function startTrackingRemote() {
+            if (!appSettings.remoteLiveCode) return;
+            if (remoteFetchIntervalId) clearInterval(remoteFetchIntervalId);
+            
+            fetchRemoteLocation();
+            remoteFetchIntervalId = setInterval(fetchRemoteLocation, 5000); 
+        }
+
+        function fetchRemoteLocation() {
+            if (!appSettings.remoteLiveCode) return;
+
+            fetch('https://api.github.com/gists/' + appSettings.remoteLiveCode, {
+                headers: { 'Authorization': 'token ' + appSettings.githubToken, 'Accept': 'application/vnd.github.v3+json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.files && data.files["live_loc.txt"]) {
+                    var compressed = data.files["live_loc.txt"].content;
+                    var decompressed = LZString.decompressFromBase64(compressed);
+                    var loc = JSON.parse(decompressed);
+
+                    // අනුගාමියා ඔෆ්ලයින් දැයි පරීක්ෂා කිරීම
+                    if (loc.offline) {
+                        if (remoteMarker) {
+                            map.removeLayer(remoteMarker);
+                            remoteMarker = null;
+                            remoteAnimFrameId = null;
+                            remoteIsRotating = false;
+                        }
+                        document.getElementById('status').innerText = "🔴 අනුගාමියා ඔෆ්ලයින් වී ඇත.";
+                        document.getElementById('status').style.display = 'block';
+                        setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 3000);
+                    } else if (loc && loc.lat && loc.lng) {
+                        var newLatLng = L.latLng(loc.lat, loc.lng);
+                        var newHeading = loc.h || 0;
+
+                        if (!remoteMarker) {
+                            remoteMarker = L.marker(newLatLng, { icon: createRemoteArrowIcon(newHeading) }).addTo(map);
+                            remoteMarker.bindPopup("අනුගාමියාගේ ස්ථානය (Live)");
+                            remoteCurrentHeading = newHeading;
+                            map.setView(newLatLng, 16);
+                            
+                            document.getElementById('status').innerText = "🟢 අනුගාමියා ඔන්ලයින් වී ඇත.";
+                            document.getElementById('status').style.display = 'block';
+                            setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 3000);
+                        } else {
+                            remoteStartLatLng = remoteMarker.getLatLng();
+                            remoteTargetLatLng = newLatLng;
+                            remoteStartTime = Date.now();
+                            remoteDuration = 5000;
+                            if (!remoteAnimFrameId) remoteAnimFrameId = requestAnimationFrame(animateRemoteMovement);
+                            
+                            triggerRemoteArrowRotation(newHeading);
+                        }
+                    }
+                }
+            }).catch(err => {});
+        }
+
+        function stopTrackingRemote() {
+            if (remoteFetchIntervalId) { clearInterval(remoteFetchIntervalId); remoteFetchIntervalId = null; }
+            if (remoteMarker) { map.removeLayer(remoteMarker); remoteMarker = null; }
+            if (remoteAnimFrameId) { cancelAnimationFrame(remoteAnimFrameId); remoteAnimFrameId = null; }
+        }
+
+        function createRemoteArrowIcon(heading) {
+            var svgContent = `<circle cx="12" cy="12" r="8" fill="#FF5722" stroke="#ffffff" stroke-width="2.5"/><path d="M12 3 L15 12 L12 10.5 L9 12 Z" fill="#ffffff"/><path d="M12 21 L15 12 L12 13.5 L9 12 Z" fill="rgba(255,255,255,0.4)"/>`;
+            return L.divIcon({ 
+                html: `<svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${heading}deg); transition: transform 0.2s ease-out; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));">${svgContent}</svg>`, 
+                className: '', iconSize: [40, 40], iconAnchor: [20, 20] 
+            });
+        }
+
+        function animateRemoteMovement() {
+            var elapsed = Date.now() - remoteStartTime, progress = Math.min(elapsed / remoteDuration, 1);
+            var easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+            if (remoteStartLatLng && remoteTargetLatLng) {
+                var currentLat = remoteStartLatLng.lat + (remoteTargetLatLng.lat - remoteStartLatLng.lat) * easeProgress;
+                var currentLng = remoteStartLatLng.lng + (remoteTargetLatLng.lng - remoteStartLatLng.lng) * easeProgress;
+                if (remoteMarker) remoteMarker.setLatLng([currentLat, currentLng]);
+            }
+            if (progress < 1) { remoteAnimFrameId = requestAnimationFrame(animateRemoteMovement); } else { remoteAnimFrameId = null; }
+        }
+
+        function animateRemoteRotation() {
+            var hElapsed = Date.now() - remoteHeadingStartTime, hProgress = Math.min(hElapsed / remoteHeadingDuration, 1);
+            var hEase = hProgress < 0.5 ? 2 * hProgress * hProgress : 1 - Math.pow(-2 * hProgress + 2, 2) / 2;
+            var animatedHeading = remoteStartHeading + getShortestAngleDiff(remoteStartHeading, remoteTargetHeading) * hEase;
+            if (animatedHeading < 0) animatedHeading += 360; if (animatedHeading >= 360) animatedHeading -= 360;
+            remoteCurrentHeading = animatedHeading;
+            if (remoteMarker) remoteMarker.setIcon(createRemoteArrowIcon(remoteCurrentHeading));
+            if (hProgress < 1) { requestAnimationFrame(animateRemoteRotation); } else { remoteIsRotating = false; }
+        }
+
+        function triggerRemoteArrowRotation(newHeading) {
+            if (Math.abs(getShortestAngleDiff(remoteCurrentHeading, newHeading)) < 2) return;
+            remoteStartHeading = remoteCurrentHeading; remoteTargetHeading = newHeading; remoteHeadingStartTime = Date.now();
+            if (!remoteIsRotating) { remoteIsRotating = true; requestAnimationFrame(animateRemoteRotation); }
         }
 
         window.addNewCategory = function() {
@@ -477,6 +813,8 @@
         function renderPlaces() {
             placeMarkers.forEach(m => map.removeLayer(m.marker)); placeMarkers = [];
             routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
+            touchLines.forEach(t => map.removeLayer(t)); touchLines = [];
+            routeLineMap = {}; touchLineMap = {};
             activeMarkerId = null; 
             
             var activePlaces = allPlaces.filter(p => p.category === activeCategory);
@@ -526,7 +864,12 @@
                 marker.on('contextmenu', function(e) { L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e); });
 
                 if (index > 0) {
-                    drawPerfectRoute(activePlaces[index - 1].latlng, place.latlng, false);
+                    var p1 = activePlaces[index - 1];
+                    var p2 = place;
+                    var connId = p1.id + "_" + p2.id;
+                    if (!deletedConnections.includes(connId)) {
+                        drawPerfectRoute(p1.latlng, p2.latlng, false, null, connId);
+                    }
                 }
             });
             setTimeout(updateMarkerScales, 50);
@@ -552,9 +895,9 @@
             document.getElementById('status').style.display = 'block';
 
             var shortPlaces = allPlaces.map(function(p) {
-                return { n: p.name, c: p.category, l: p.latlng, h: p.hideTime, i: p.hasImage ? p.imageSrc : "", r: p.isReached ? true : false };
+                return { id: p.id, n: p.name, c: p.category, l: p.latlng, h: p.hideTime, i: p.hasImage ? p.imageSrc : "", r: p.isReached ? true : false };
             });
-            var dataStr = JSON.stringify({ p: shortPlaces, c: categories, t: appSettings.githubToken });
+            var dataStr = JSON.stringify({ p: shortPlaces, c: categories, t: appSettings.githubToken, dc: deletedConnections, as: appSettings.arrowStyle });
             var compressed = LZString.compressToBase64(dataStr);
 
             fetch('https://api.github.com/gists', {
@@ -632,12 +975,21 @@
                         if (parsedData.t) {
                             appSettings.githubToken = parsedData.t;
                             document.getElementById('settingsToken').value = parsedData.t;
-                            localStorage.setItem('appSettings', JSON.stringify(appSettings));
+                        }
+                        if (parsedData.as) {
+                            appSettings.arrowStyle = parsedData.as;
+                            document.getElementById('settingsArrowStyle').value = parsedData.as;
+                            if (liveMarker) liveMarker.setIcon(createArrowIcon(currentHeading));
                         }
 
+                        localStorage.setItem('appSettings', JSON.stringify(appSettings));
+
+                        var idMap = {};
                         var importedPlaces = parsedData.p.map(function(sp) {
+                            var newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                            if (sp.id) idMap[sp.id] = newId; 
                             return {
-                                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                                id: newId,
                                 category: sp.c,
                                 latlng: sp.l,
                                 name: sp.n,
@@ -649,6 +1001,21 @@
                             };
                         });
 
+                        var newDeletedConn = [];
+                        if (parsedData.dc && Array.isArray(parsedData.dc)) {
+                            parsedData.dc.forEach(function(oldConn) {
+                                var parts = oldConn.split("_");
+                                if (parts.length === 2) {
+                                    var p1New = idMap[parts[0]];
+                                    var p2New = idMap[parts[1]];
+                                    if (p1New && p2New) {
+                                        newDeletedConn.push(p1New + "_" + p2New);
+                                    }
+                                }
+                            });
+                        }
+                        deletedConnections = newDeletedConn;
+
                         allPlaces = allPlaces.concat(importedPlaces);
                         categories = Array.from(new Set([...categories, ...parsedData.c])); 
                         savePlaces();
@@ -656,7 +1023,7 @@
                         updateCategoryDropdown(); renderPlaces(); 
                         document.getElementById('serverRestoreModal').style.display = 'none';
                         document.getElementById('status').style.display = 'none';
-                        alert("✅ සෙවුර් එකෙන් ස්ථාන සහ Token එක සාර්ථකව එකතු විය!");
+                        alert("✅ සෙවුර් එකෙන් ස්ථාන, මැකුම් සහ ඊතලය සාර්ථකව එකතු විය!");
                     } else {
                         throw "Invalid Data";
                     }
@@ -683,7 +1050,21 @@
         map.on('zoomend', updateMarkerScales);
 
         function createArrowIcon(heading) {
-            return L.divIcon({ html: `<svg width="50" height="50" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${heading}deg);"><path d="M50 5 L85 95 L50 78 L15 95 Z" fill="#1A73E8" stroke="white" stroke-width="6" stroke-linejoin="round"/><circle cx="50" cy="50" r="5" fill="white" opacity="0.9"/></svg>`, className: '', iconSize: [50, 50], iconAnchor: [25, 25] });
+            var style = appSettings.arrowStyle || 'circle';
+            var svgContent = '';
+            if (style === 'flat') {
+                svgContent = `<path d="M12 2 L22 22 L12 18 L2 22 Z" fill="#1A73E8" stroke="#ffffff" stroke-width="1.5"/>`;
+            } else if (style === '3d') {
+                svgContent = `<path d="M12 2 L20 10 L12 14 L4 10 Z" fill="#1A73E8"/><path d="M12 14 L20 10 L20 12 L12 22 Z" fill="#1558b8"/><path d="M12 14 L4 10 L4 12 L12 22 Z" fill="#0d4090"/>`;
+            } else if (style === 'pointer') {
+                svgContent = `<path d="M4 2 L22 12 L4 22 L8 12 Z" fill="#1A73E8" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>`;
+            } else {
+                svgContent = `<circle cx="12" cy="12" r="8" fill="#1A73E8" stroke="#ffffff" stroke-width="2.5"/><path d="M12 3 L15 12 L12 10.5 L9 12 Z" fill="#ffffff"/><path d="M12 21 L15 12 L12 13.5 L9 12 Z" fill="rgba(255,255,255,0.4)"/>`;
+            }
+            return L.divIcon({ 
+                html: `<svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${heading}deg); transition: transform 0.2s ease-out; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));">${svgContent}</svg>`, 
+                className: '', iconSize: [40, 40], iconAnchor: [20, 20] 
+            });
         }
 
         function getShortestAngleDiff(start, end) { var diff = end - start; if (diff > 180) diff -= 360; if (diff < -180) diff += 360; return diff; }
@@ -740,12 +1121,16 @@
             allPlaces.push(newPlace);
             renderPlaces(); 
             
-            var startPoint, endPoint = tempLatLng;
+            var startPoint, endPoint = tempLatLng, startId = null;
             var activePlaces = allPlaces.filter(p => p.category === activeCategory);
-            if (activePlaces.length === 1) { startPoint = liveMarker ? liveMarker.getLatLng() : map.getCenter(); } 
-            else { startPoint = activePlaces[activePlaces.length - 2].latlng; }
-            
-            drawPerfectRoute(startPoint, endPoint, appSettings.autoNavigate, newPlace.id);
+            if (activePlaces.length === 1) { 
+                startPoint = liveMarker ? liveMarker.getLatLng() : map.getCenter(); 
+            } else { 
+                startPoint = activePlaces[activePlaces.length - 2].latlng; 
+                startId = activePlaces[activePlaces.length - 2].id;
+            }
+            var connId = startId ? startId + "_" + newPlace.id : null;
+            drawPerfectRoute(startPoint, endPoint, appSettings.autoNavigate, newPlace.id, connId);
             tempLatLng = null; 
             document.getElementById('placeName').value = "";
             savePlaces(); 
@@ -854,20 +1239,64 @@
             this.value = ""; 
         });
 
-        async function drawPerfectRoute(startLoc, endLoc, doNavigate = true, targetId = null) {
+        async function drawPerfectRoute(startLoc, endLoc, doNavigate = true, targetId = null, connId = null) {
             document.getElementById('status').style.display = 'block';
             document.getElementById('status').innerText = "🟡 පාර සොයමින්...";
             try {
                 var routeData = await fetchRoute(startLoc, endLoc);
                 var routeCoords = routeData.coordinates.map(c => [c[1], c[0]]);
+                
                 var allCoords = [];
                 allCoords.push([startLoc.lat, startLoc.lng]);
                 allCoords.push(routeCoords[0]);
-                for (var i = 1; i < routeCoords.length; i++) { allCoords.push(routeCoords[i]); }
+                for (var i = 1; i < routeCoords.length; i++) {
+                    allCoords.push(routeCoords[i]);
+                }
                 allCoords.push([endLoc.lat, endLoc.lng]);
                 
+                if (connId && routeLineMap[connId]) {
+                    map.removeLayer(routeLineMap[connId]);
+                    delete routeLineMap[connId];
+                }
+                if (connId && touchLineMap[connId]) {
+                    map.removeLayer(touchLineMap[connId]);
+                    delete touchLineMap[connId];
+                }
+
                 var routeLine = L.polyline(allCoords, { color: appSettings.routeColor, weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+                var touchLine = L.polyline(allCoords, { color: '#000', weight: 20, opacity: 0, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+                
+                touchLine.on('click', function(e) {
+                    L.DomEvent.stopPropagation(e); 
+                    if (connId) {
+                        if (routeLineMap[connId]) { map.removeLayer(routeLineMap[connId]); delete routeLineMap[connId]; }
+                        if (touchLineMap[connId]) { map.removeLayer(touchLineMap[connId]); delete touchLineMap[connId]; }
+                        
+                        if (!deletedConnections.includes(connId)) {
+                            deletedConnections.push(connId);
+                            savePlaces(); 
+                        }
+                    } else {
+                        map.removeLayer(routeLine);
+                        map.removeLayer(touchLine);
+                    }
+                    
+                    var idx = routeLines.indexOf(routeLine);
+                    if (idx > -1) routeLines.splice(idx, 1);
+                    var tIdx = touchLines.indexOf(touchLine);
+                    if (tIdx > -1) touchLines.splice(tIdx, 1);
+                    
+                    document.getElementById('status').innerText = "🛣️ පාරේ ඉර මකාදමන ලදී.";
+                    document.getElementById('status').style.display = 'block';
+                    setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 1500);
+                });
+
                 routeLines.push(routeLine);
+                touchLines.push(touchLine);
+                if (connId) {
+                    routeLineMap[connId] = routeLine;
+                    touchLineMap[connId] = touchLine;
+                }
 
                 if (doNavigate) {
                     var totalDistance = 0;
@@ -879,8 +1308,6 @@
                     if (liveMarker) startAutoNavigation(allCoords, targetId);
                 }
             } catch (error) {
-                var straightLine = L.polyline([startLoc, endLoc], { color: appSettings.routeColor, weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round' }).addTo(map);
-                routeLines.push(straightLine);
                 if (doNavigate) {
                     document.getElementById('status').innerText = "⚠️ පාරක් හමු නොවීය";
                     setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
@@ -954,8 +1381,11 @@
             }
             
             isAutoNavigating = false; if (navAnimationFrameId) cancelAnimationFrame(navAnimationFrameId); navAnimationFrameId = null;
-            allPlaces = []; categories = []; activeCategory = ""; 
-            placeMarkers.forEach(m => map.removeLayer(m.marker)); placeMarkers = []; routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
+            allPlaces = []; categories = []; activeCategory = ""; deletedConnections = [];
+            placeMarkers.forEach(m => map.removeLayer(m.marker)); placeMarkers = []; 
+            routeLines.forEach(r => map.removeLayer(r)); routeLines = [];
+            touchLines.forEach(t => map.removeLayer(t)); touchLines = [];
+            routeLineMap = {}; touchLineMap = {};
             activeMarkerId = null; for (var key in hideTimers) clearTimeout(hideTimers[key]); hideTimers = {};
             localStorage.removeItem('myMapPlaces'); 
             
@@ -976,62 +1406,90 @@
                 watchId = navigator.geolocation.watchPosition(pos => {
                     var lat = pos.coords.latitude, lon = pos.coords.longitude, acc = pos.coords.accuracy;
                     var heading = pos.coords.heading, speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
-                    var newLocation = L.latLng(lat, lon); latestExactLocation = newLocation; 
+                    var rawLocation = L.latLng(lat, lon); 
                     
-                    if(!isAutoNavigating) {
-                        if (heading !== null && !isNaN(heading) && speed > 0.5) triggerArrowRotation(heading);
-                        else if (lastLatLng && speed > 0.5 && lastLatLng.distanceTo(newLocation) > 1) triggerArrowRotation(getBearing(lastLatLng.lat, lastLatLng.lng, lat, lon));
+                    function processLocation(snappedLocation) {
+                        var newLocation = snappedLocation;
+                        latestExactLocation = newLocation; 
+                        
+                        if(!isAutoNavigating) {
+                            if (heading !== null && !isNaN(heading) && speed > 0.5) triggerArrowRotation(heading);
+                            else if (lastLatLng && speed > 0.5 && lastLatLng.distanceTo(newLocation) > 1) triggerArrowRotation(getBearing(lastLatLng.lat, lastLatLng.lng, newLocation.lat, newLocation.lng));
+                        }
+
+                        if (!liveMarker) {
+                            liveMarker = L.marker(newLocation, { icon: createArrowIcon(currentHeading) }).addTo(map);
+                            liveMarker.speed = speed;
+                            accuracyCircle = L.circle(rawLocation, { radius: acc, color: '#1A73E8', fillColor: '#1A73E8', fillOpacity: 0.15, weight: 1 }).addTo(map);
+                            map.setView(newLocation, 18);
+                        } else {
+                            if(!isAutoNavigating) {
+                                liveMarker.speed = speed; 
+                                startLatLng = liveMarker.getLatLng(); targetLatLng = newLocation; startTime = Date.now();
+                                duration = 1000;
+                                if (!animationFrameId) animationFrameId = requestAnimationFrame(animateMovement);
+                            }
+                            if (accuracyCircle) { accuracyCircle.setLatLng(rawLocation); accuracyCircle.setRadius(acc); }
+                        }
+                        
+                        if (!isAutoNavigating) {
+                            allPlaces.forEach(function(place) {
+                                var placeLoc = L.latLng(place.latlng.lat, place.latlng.lng);
+                                var dist = newLocation.distanceTo(placeLoc);
+                                var mObj = placeMarkers.find(m => m.id === place.id);
+                                
+                                if (dist < 30) {
+                                    if (!place.isReached) {
+                                        place.isReached = true;
+                                        if (mObj && !place.isVisible) mObj.marker.setIcon(createNameIcon(place.name, true));
+                                        savePlaces();
+                                    }
+                                    if (!liveBeepedFlags[place.id]) {
+                                        playBeepMultiple(appSettings.beepCount);
+                                        liveBeepedFlags[place.id] = true;
+                                    }
+                                } else {
+                                    if (place.isReached) {
+                                        place.isReached = false;
+                                        if (mObj && !place.isVisible) mObj.marker.setIcon(createNameIcon(place.name, false));
+                                        savePlaces();
+                                    }
+                                    if (liveBeepedFlags[place.id]) {
+                                        delete liveBeepedFlags[place.id]; 
+                                    }
+                                }
+                            });
+                        }
+
+                        lastLatLng = newLocation;
+                        if(!isAutoNavigating) {
+                            document.getElementById('status').style.display = 'block';
+                            document.getElementById('status').innerText = "🟢 " + Math.round(speed) + " km/h | (±" + Math.round(acc) + "මී)";
+                        }
                     }
 
-                    if (!liveMarker) {
-                        liveMarker = L.marker(newLocation, { icon: createArrowIcon(currentHeading) }).addTo(map);
-                        liveMarker.speed = speed;
-                        accuracyCircle = L.circle(newLocation, { radius: acc, color: '#1A73E8', fillColor: '#1A73E8', fillOpacity: 0.15, weight: 1 }).addTo(map);
-                        map.setView(newLocation, 18);
+                    if (speed < 1 || (liveMarker && liveMarker.getLatLng().distanceTo(rawLocation) < 10)) {
+                        processLocation(rawLocation);
                     } else {
-                        if(!isAutoNavigating) {
-                            liveMarker.speed = speed; 
-                            startLatLng = liveMarker.getLatLng(); targetLatLng = newLocation; startTime = Date.now();
-                            duration = 1000;
-                            if (!animationFrameId) animationFrameId = requestAnimationFrame(animateMovement);
-                        }
-                        if (accuracyCircle) { accuracyCircle.setLatLng(newLocation); accuracyCircle.setRadius(acc); }
-                    }
-                    
-                    if (!isAutoNavigating) {
-                        allPlaces.forEach(function(place) {
-                            var placeLoc = L.latLng(place.latlng.lat, place.latlng.lng);
-                            var dist = newLocation.distanceTo(placeLoc);
-                            var mObj = placeMarkers.find(m => m.id === place.id);
-                            
-                            if (dist < 30) {
-                                if (!place.isReached) {
-                                    place.isReached = true;
-                                    if (mObj && !place.isVisible) mObj.marker.setIcon(createNameIcon(place.name, true));
-                                    savePlaces();
-                                }
-                                if (!liveBeepedFlags[place.id]) {
-                                    playBeepMultiple(appSettings.beepCount);
-                                    liveBeepedFlags[place.id] = true;
-                                }
+                        var startSnap = liveMarker ? liveMarker.getLatLng() : rawLocation;
+                        fetchRoute(startSnap, rawLocation).then(routeData => {
+                            if (routeData && routeData.coordinates && routeData.coordinates.length > 0) {
+                                var closest = routeData.coordinates[0];
+                                var minDist = Infinity;
+                                routeData.coordinates.forEach(c => {
+                                    var p = L.latLng(c[1], c[0]);
+                                    var d = p.distanceTo(rawLocation);
+                                    if (d < minDist) { minDist = d; closest = c; }
+                                });
+                                processLocation(L.latLng(closest[1], closest[0]));
                             } else {
-                                if (place.isReached) {
-                                    place.isReached = false;
-                                    if (mObj && !place.isVisible) mObj.marker.setIcon(createNameIcon(place.name, false));
-                                    savePlaces();
-                                }
-                                if (liveBeepedFlags[place.id]) {
-                                    delete liveBeepedFlags[place.id]; 
-                                }
+                                processLocation(rawLocation);
                             }
+                        }).catch(err => {
+                            processLocation(rawLocation);
                         });
                     }
 
-                    lastLatLng = newLocation;
-                    if(!isAutoNavigating) {
-                        document.getElementById('status').style.display = 'block';
-                        document.getElementById('status').innerText = "🟢 " + Math.round(speed) + " km/h | (±" + Math.round(acc) + "මී)";
-                    }
                 }, err => { document.getElementById('status').innerText = "❌ GPS Permission දීලා නැද්ද බලන්න!"; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
             }
         }
@@ -1049,6 +1507,32 @@
         loadSettings();
         startLiveTracking();
         loadPlaces(); 
+
+        if (appSettings.shareMyLive) startSharingMyLive();
+        if (appSettings.remoteLiveCode) startTrackingRemote();
+
+        // යෙදුමෙන් පිටවීමේදී (Tab Close කිරීමේදී) ස්වයංක්‍රීයව ඔෆ්ලයින් බව දැනුම් දීම
+        window.addEventListener('pagehide', function() {
+            if (appSettings.shareMyLive && appSettings.myLiveCode) {
+                var offlineData = JSON.stringify({ offline: true, t: Date.now() });
+                var compressed = LZString.compressToBase64(offlineData);
+                navigator.sendBeacon('https://api.github.com/gists/' + appSettings.myLiveCode,
+                    new Blob([JSON.stringify({
+                        "description": "Live Loc",
+                        "public": false,
+                        "files": { "live_loc.txt": { "content": compressed } }
+                    })], { type: 'application/json' })
+                );
+                
+                // sendBeacon හරහා Auth Headers යැවිය නොහැකි නිසා fetch භාවිතා කිරීම (keepalive)
+                fetch('https://api.github.com/gists/' + appSettings.myLiveCode, {
+                    method: 'PATCH',
+                    headers: { 'Authorization': 'token ' + appSettings.githubToken, 'Accept': 'application/vnd.github.v3+json' },
+                    body: JSON.stringify({ "files": { "live_loc.txt": { "content": compressed } } }),
+                    keepalive: true
+                });
+            }
+        });
 
         function requestPermission() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
